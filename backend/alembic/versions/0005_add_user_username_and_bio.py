@@ -16,18 +16,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("username", sa.String(length=80), nullable=True))
-    op.add_column("users", sa.Column("bio", sa.String(length=280), nullable=True))
+    op.add_column("users", sa.Column(
+        "username", sa.String(length=80), nullable=True))
+    op.add_column("users", sa.Column(
+        "bio", sa.String(length=280), nullable=True))
 
     bind = op.get_bind()
-    users = bind.execute(sa.text("SELECT id, name FROM users ORDER BY id")).fetchall()
+    users = bind.execute(
+        sa.text("SELECT id, name FROM users ORDER BY id")).fetchall()
     seen: set[str] = set()
 
     def slugify(value: str) -> str:
         import re
         import unicodedata
 
-        normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+        normalized = unicodedata.normalize("NFKD", value).encode(
+            "ascii", "ignore").decode("ascii")
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", normalized).strip("-").lower()
         slug = re.sub(r"-{2,}", "-", slug)
         return slug or "user"
@@ -40,7 +44,8 @@ def upgrade() -> None:
             candidate = f"{base}-{suffix}"
             suffix += 1
         seen.add(candidate)
-        bind.execute(sa.text("UPDATE users SET username = :username WHERE id = :id"), {"username": candidate, "id": row.id})
+        bind.execute(sa.text("UPDATE users SET username = :username WHERE id = :id"), {
+                     "username": candidate, "id": row.id})
 
     op.create_index("ix_users_username", "users", ["username"], unique=True)
 

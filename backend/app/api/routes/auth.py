@@ -71,12 +71,14 @@ def signup(request: Request, payload: SignupRequest, db: DbSession = Depends(get
         # Same message either way in a real product to avoid user
         # enumeration; kept explicit here since this is a learning project
         # and the clearer error is more useful while building against it.
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "An account with this email already exists")
 
     # No User row yet on purpose -- see app/services/pending_signup.py.
     # The account only becomes real once the OTP is verified, so an
     # abandoned signup never leaves a permanent row behind.
-    code = pending_signup.create_pending_signup(payload.email, payload.password, payload.name, payload.timezone)
+    code = pending_signup.create_pending_signup(
+        payload.email, payload.password, payload.name, payload.timezone)
     send_otp_email.delay(payload.email, code, OtpPurpose.SIGNUP_VERIFY.value)
     return SignupResponse(message="Check your email for a verification code.", email=payload.email)
 
@@ -86,14 +88,16 @@ def signup(request: Request, payload: SignupRequest, db: DbSession = Depends(get
 def verify_signup_otp(request: Request, payload: VerifyOtpRequest, db: DbSession = Depends(get_db)):
     pending = pending_signup.verify_pending_signup(payload.email, payload.code)
     if pending is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired code -- try signing up again")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "Invalid or expired code -- try signing up again")
 
     # Defensive re-check: someone could've completed a signup for this
     # exact email in the (tiny) window between requests -- e.g. two tabs
     # racing the same signup. The Redis entry is already consumed at this
     # point either way, so the user just has to sign up again.
     if db.scalar(select(User).where(User.email == pending["email"])) is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "An account with this email already exists")
 
     user = User(
         email=pending["email"],
@@ -121,7 +125,8 @@ def resend_signup_otp(request: Request, payload: ResendOtpRequest):
     someone else's inbox by resending against an email you don't own."""
     code = pending_signup.resend_pending_signup(payload.email)
     if code is not None:
-        send_otp_email.delay(payload.email, code, OtpPurpose.SIGNUP_VERIFY.value)
+        send_otp_email.delay(payload.email, code,
+                             OtpPurpose.SIGNUP_VERIFY.value)
     # Always 202 -- same anti-enumeration reasoning as password reset:
     # don't reveal whether this email has a pending signup.
     return {"message": "If that email has a pending signup, a new code has been sent."}
@@ -133,13 +138,16 @@ def login(request: Request, payload: LoginRequest, db: DbSession = Depends(get_d
     user = db.scalar(select(User).where(User.email == payload.email))
 
     if user is None or user.password_hash is None or not verify_password(payload.password, user.password_hash):
-        _log_login_attempt(db, request, payload.email, False, user.id if user else None)
+        _log_login_attempt(db, request, payload.email,
+                           False, user.id if user else None)
         db.commit()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                            "Incorrect email or password")
 
     if not user.is_email_verified:
         db.commit()
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Email not verified yet")
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Email not verified yet")
 
     if user.totp_enabled:
         _log_login_attempt(db, request, payload.email, True, user.id)
@@ -157,7 +165,8 @@ def login(request: Request, payload: LoginRequest, db: DbSession = Depends(get_d
 def verify_2fa(request: Request, payload: TwoFactorVerifyRequest, db: DbSession = Depends(get_db)):
     user = db.get(User, payload.user_id)
     if user is None or not user.totp_enabled or not user.totp_secret:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "2FA is not enabled for this account")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "2FA is not enabled for this account")
 
     totp = pyotp.TOTP(user.totp_secret)
     if not totp.verify(payload.code, valid_window=1):
@@ -172,12 +181,15 @@ def verify_2fa(request: Request, payload: TwoFactorVerifyRequest, db: DbSession 
 @limiter.limit("20/minute")
 def refresh_token(request: Request, payload: RefreshRequest, db: DbSession = Depends(get_db)):
     try:
-        access, refresh, _user = auth_service.rotate_refresh_token(db, payload.refresh_token)
+        access, refresh, _user = auth_service.rotate_refresh_token(
+            db, payload.refresh_token)
     except auth_service.RefreshTokenReuseError:
         db.commit()  # persist the chain revocation
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Refresh token reuse detected -- please log in again")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                            "Refresh token reuse detected -- please log in again")
     except auth_service.InvalidRefreshTokenError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired refresh token")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                            "Invalid or expired refresh token")
 
     db.commit()
     return TokenPair(access_token=access, refresh_token=refresh)
@@ -246,7 +258,8 @@ def request_password_reset(request: Request, payload: PasswordResetRequest, db: 
         db.add(
             OtpCode(
                 user_id=user.id,
-                code_hash=hash_token(raw),  # reuse the fast hash: this is a high-entropy token, not a short OTP
+                # reuse the fast hash: this is a high-entropy token, not a short OTP
+                code_hash=hash_token(raw),
                 purpose=OtpPurpose.PASSWORD_RESET,
                 expires_at=datetime.now(tz.utc) + timedelta(minutes=30),
             )
@@ -271,7 +284,8 @@ def confirm_password_reset(request: Request, payload: PasswordResetConfirm, db: 
         )
     )
     if row is None or row.expires_at < datetime.now(tz.utc):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired reset link")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "Invalid or expired reset link")
 
     user = db.get(User, row.user_id)
     user.password_hash = hash_password(payload.new_password)
@@ -292,18 +306,21 @@ def confirm_password_reset(request: Request, payload: PasswordResetConfirm, db: 
 @router.post("/2fa/setup", response_model=TotpSetupResponse)
 def setup_2fa(user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
     if user.totp_enabled:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "2FA is already enabled")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "2FA is already enabled")
     secret = pyotp.random_base32()
     user.totp_secret = secret  # not yet "enabled" until /2fa/enable confirms a valid code
     db.commit()
-    uri = pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="SkillSwap")
+    uri = pyotp.TOTP(secret).provisioning_uri(
+        name=user.email, issuer_name="SkillSwap")
     return TotpSetupResponse(secret=secret, otpauth_uri=uri)
 
 
 @router.post("/2fa/enable", status_code=status.HTTP_200_OK)
 def enable_2fa(payload: TotpEnableRequest, user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
     if not user.totp_secret:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Call /2fa/setup first")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "Call /2fa/setup first")
     if not pyotp.TOTP(user.totp_secret).verify(payload.code, valid_window=1):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid code")
     user.totp_enabled = True
@@ -328,9 +345,11 @@ def change_password(payload: ChangePasswordRequest, user: User = Depends(get_cur
     flow. Google-only accounts (no password_hash) can't use this; they'd
     need to set a password via some other flow, which v1 doesn't build."""
     if user.password_hash is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This account signs in with Google and has no password to change")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "This account signs in with Google and has no password to change")
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Current password is incorrect")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                            "Current password is incorrect")
 
     user.password_hash = hash_password(payload.new_password)
     # Same reasoning as the emailed-reset flow: a password change should

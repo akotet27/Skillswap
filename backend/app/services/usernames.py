@@ -10,7 +10,8 @@ from app.models.user import User
 
 
 def slugify_username(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    normalized = unicodedata.normalize("NFKD", value).encode(
+        "ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", normalized).strip("-").lower()
     slug = re.sub(r"-{2,}", "-", slug)
     return slug or "user"

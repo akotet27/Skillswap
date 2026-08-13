@@ -40,7 +40,8 @@ def update_me(payload: UserUpdate, user: User = Depends(get_current_user), db: D
     if payload.name is not None:
         user.name = payload.name
     if payload.username is not None:
-        user.username = build_unique_username(db, payload.username, exclude_user_id=user.id)
+        user.username = build_unique_username(
+            db, payload.username, exclude_user_id=user.id)
     if payload.bio is not None:
         user.bio = payload.bio
     if payload.timezone is not None:
@@ -57,14 +58,17 @@ def upload_photo(
 ):
     allowed = {"image/jpeg", "image/png", "image/webp"}
     if file.content_type not in allowed:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only JPEG, PNG, or WEBP images are allowed")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "Only JPEG, PNG, or WEBP images are allowed")
 
     contents = file.file.read(settings.MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(contents) > settings.MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"File exceeds {settings.MAX_UPLOAD_MB}MB limit")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            f"File exceeds {settings.MAX_UPLOAD_MB}MB limit")
 
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "avatars"), exist_ok=True)
-    ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[file.content_type]
+    ext = {"image/jpeg": "jpg", "image/png": "png",
+           "image/webp": "webp"}[file.content_type]
     filename = f"{uuid.uuid4().hex}.{ext}"
     path = os.path.join(settings.UPLOAD_DIR, "avatars", filename)
     with open(path, "wb") as f:
@@ -92,7 +96,8 @@ def get_presence(ids: str, _user: User = Depends(get_current_user)):
     try:
         id_list = [int(x) for x in ids.split(",") if x.strip()]
     except ValueError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "ids must be a comma-separated list of integers")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "ids must be a comma-separated list of integers")
     online = manager.online_ids(id_list)
     return {uid: (uid in online) for uid in id_list}
 
@@ -121,11 +126,14 @@ def get_public_profile_by_identifier(identifier: str, db: DbSession = Depends(ge
         .order_by(UserSkill.created_at.desc())
     ).all()
     ratings = db.scalar(
-        select(func.coalesce(func.avg(Rating.score), 0.0)).where(Rating.ratee_id == user.id)
+        select(func.coalesce(func.avg(Rating.score), 0.0)).where(
+            Rating.ratee_id == user.id)
     )
-    rating_count = db.scalar(select(func.count(Rating.id)).where(Rating.ratee_id == user.id)) or 0
+    rating_count = db.scalar(select(func.count(Rating.id)).where(
+        Rating.ratee_id == user.id)) or 0
 
-    availability = db.scalars(select(Availability).where(Availability.user_id == user.id)).all()
+    availability = db.scalars(select(Availability).where(
+        Availability.user_id == user.id)).all()
     availability_summary = _summarize_availability(availability)
 
     return PublicUserOut(
@@ -137,14 +145,16 @@ def get_public_profile_by_identifier(identifier: str, db: DbSession = Depends(ge
         rating_average=float(ratings) if ratings is not None else None,
         rating_count=int(rating_count),
         availability_summary=availability_summary,
-        teach_skills=[PublicSkillOut.model_validate(link.skill) for link in teach_skills],
+        teach_skills=[PublicSkillOut.model_validate(
+            link.skill) for link in teach_skills],
     )
 
 
 def _summarize_availability(blocks: list[Availability]) -> str | None:
     if not blocks:
         return None
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_names = ["Monday", "Tuesday", "Wednesday",
+                 "Thursday", "Friday", "Saturday", "Sunday"]
     parts: list[str] = []
     seen: set[str] = set()
     for block in blocks:
@@ -188,7 +198,8 @@ def list_my_skills(user: User = Depends(get_current_user), db: DbSession = Depen
 
 @router.post("/me/skills", response_model=UserSkillOut, status_code=status.HTTP_201_CREATED)
 def add_my_skill(payload: UserSkillCreate, user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
-    skill = db.scalar(select(Skill).where(Skill.name.ilike(payload.skill_name)))
+    skill = db.scalar(select(Skill).where(
+        Skill.name.ilike(payload.skill_name)))
     if skill is None:
         skill = Skill(name=payload.skill_name, category=payload.category)
         db.add(skill)
@@ -200,7 +211,8 @@ def add_my_skill(payload: UserSkillCreate, user: User = Depends(get_current_user
         )
     )
     if existing is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "That skill is already tagged")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "That skill is already tagged")
 
     # A skill can't be both taught and wanted by the same person -- doesn't
     # make sense (why would you want to learn something you already
@@ -270,7 +282,8 @@ def replace_my_availability(
     submits its complete current state, which is simpler to reason about
     than diffing individual blocks client-side."""
     db.query(Availability).filter(Availability.user_id == user.id).delete()
-    rows = [Availability(user_id=user.id, **block.model_dump()) for block in blocks]
+    rows = [Availability(user_id=user.id, **block.model_dump())
+            for block in blocks]
     db.add_all(rows)
     db.commit()
     cache_invalidate(match_cache_key(user.id))

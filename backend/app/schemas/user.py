@@ -27,7 +27,8 @@ class UserUpdate(BaseModel):
     username: str | None = Field(default=None, min_length=1, max_length=80)
     bio: str | None = Field(default=None, max_length=280)
     timezone: str | None = None
-    age: int | None = Field(default=None, ge=18, le=130)  # adults-only platform -- see ck_user_age_range
+    # adults-only platform -- see ck_user_age_range
+    age: int | None = Field(default=None, ge=18, le=130)
 
 
 class PublicSkillOut(BaseModel):
