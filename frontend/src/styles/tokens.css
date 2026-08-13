@@ -1,0 +1,146 @@
+/*
+ * Design tokens -- the single source of truth for color/type/spacing.
+ * Every component styles from these custom properties; never a hardcoded
+ * hex/px value in component CSS.
+ *
+ * v3 palette: the user supplied a full-page mockup (nav + hero + matching
+ * carousel + video-session preview + credit-escrow diagram + testimonials
+ * + skill cloud + footer) that lands back on a Midnight-primary,
+ * near-achromatic system with a floating rounded-pill nav -- much closer
+ * to the *original* Acctual-derived brief than the intermediate
+ * bright-blue "Sessionly" pass this superseded. Electric Blue goes back
+ * to being a sparing accent (small badges/icons), not the primary
+ * interactive color. Teach/learn tag pair unchanged throughout.
+ */
+:root {
+  /* Neutrals */
+  --color-ink: #1a1d29;
+  --color-carbon: #12141c;
+  --color-midnight: #0d111b;
+  --color-smoke: #5b6472;
+  --color-fog: #8891a0;
+  --color-ash: #a3abb8;
+  --color-mist: #e2e4ec;
+  --color-paper: #ffffff;
+  --color-snow: #f4f5f9; /* neutral (barely-cool) page canvas */
+  --color-concrete: #afb0b1;
+
+  /* Brand accent -- a sparing highlight again (small badges/icons, stat
+     callouts), not a primary button fill. */
+  --color-electric-blue: #2f7cf6;
+  --color-electric-blue-dark: #2360cf; /* hover/active shade, where it's still used as a fill */
+
+  /* Decorative accents -- small chips/illustration only, never primary UI */
+  --color-iris: #6c56fc;
+  --color-magenta: #f200ca;
+  --color-leaf: #5d9c06;
+  --color-coral: #ff6363;
+  --color-danger: #f0585c; /* hang-up / destructive actions (Phase 4) */
+
+  /* Tinted surface washes */
+  --color-ice: #cfeafa;
+  --color-lavender: #e1e0fc;
+  --color-blush: #f6d2f4;
+
+  /* Teach / Learn semantic pair (SkillSwap-specific) */
+  --color-teach: var(--color-leaf);
+  --color-teach-bg: #eaf4dc;
+  --color-teach-line: #d3e8bd;
+  --color-learn: var(--color-iris);
+  --color-learn-bg: var(--color-lavender);
+  --color-learn-line: #cfccf8;
+
+  /* Semantic roles -- components reference these, not raw colors, so
+     dark mode is a single token swap below rather than a per-component one */
+  --surface: var(--color-paper);
+  --surface-alt: var(--color-snow);
+  --text-primary: var(--color-carbon);
+  --text-heading: var(--color-ink);
+  --text-secondary: var(--color-smoke);
+  --text-tertiary: var(--color-fog);
+  --text-disabled: var(--color-ash);
+  --border: var(--color-mist);
+  --nav-fill: var(--color-paper); /* the floating pill's own background */
+
+  /* Typography */
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-signature: "Caveat", cursive;
+
+  --text-eyebrow: 11px;
+  --text-body-sm: 14px;
+  --text-body: 16px;
+  --text-body-lg: 22px;
+  --text-subheading: 24px;
+  --text-heading-sm: 32px;
+  --text-heading: 40px;
+  --text-heading-lg: 48px;
+  --text-display: 64px;
+
+  /* Spacing scale (4px base unit) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* Shape */
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --shadow-hover: 0 4px 18px rgba(0, 0, 0, 0.08); /* cards: hover only, never at rest */
+  --shadow-float: 0 4px 20px rgba(15, 23, 42, 0.1); /* the floating nav pill + hero match-card: persistent, neutral */
+
+  --focus-ring: 0 0 0 3px rgba(47, 124, 246, 0.35);
+}
+
+/* Dark mode -- near-black surfaces / near-white text, brand blue
+   unchanged. Parallel token set, no component changes needed. */
+:root[data-theme="dark"] {
+  --surface: #14161c;
+  --surface-alt: #0d0f14;
+  --text-primary: #f2f2f2;
+  --text-heading: #ffffff;
+  --text-secondary: #b3b7c2;
+  --text-tertiary: #8d93a3;
+  --text-disabled: #5a5f6b;
+  --border: #2a2e38;
+  --nav-fill: #05070c;
+
+  --color-teach-bg: #1c2617;
+  --color-teach-line: #2c3b22;
+  --color-learn-bg: #221f3a;
+  --color-learn-line: #35315a;
+
+  /* A black ambient shadow is invisible against a near-black page --
+     stronger + still soft reads as "floating" against a dark surface. */
+  --shadow-float: 0 2px 16px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #14161c;
+    --surface-alt: #0d0f14;
+    --text-primary: #f2f2f2;
+    --text-heading: #ffffff;
+    --text-secondary: #b3b7c2;
+    --text-tertiary: #8d93a3;
+    --text-disabled: #5a5f6b;
+    --border: #2a2e38;
+    --nav-fill: #05070c;
+
+    --color-teach-bg: #1c2617;
+    --color-teach-line: #2c3b22;
+    --color-learn-bg: #221f3a;
+    --color-learn-line: #35315a;
+
+    --shadow-float: 0 2px 16px rgba(0, 0, 0, 0.4);
+  }
+}

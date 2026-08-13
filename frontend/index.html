@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkillSwap — Trade skills, not money</title>
+    <meta name="description" content="SkillSwap matches people who have a skill to teach with people who want to learn it, and hosts the video session right on the platform. Teach an hour, earn a credit; spend a credit to learn." />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="SkillSwap — Trade skills, not money" />
+    <meta property="og:description" content="A peer-to-peer skill mentorship marketplace with built-in scheduling and video calls." />
+    <meta property="og:type" content="website" />
+
+    <link rel="icon" href="/logo-icon.png" type="image/png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0d111b" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600&family=Caveat:wght@600&display=swap" rel="stylesheet" />
+
+    <script>
+      // Applied before paint to avoid a flash of the wrong theme -- reads
+      // the same key the in-app toggle writes to (see src/context/ThemeContext.jsx).
+      (function () {
+        var stored = localStorage.getItem("skillswap-theme");
+        var theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

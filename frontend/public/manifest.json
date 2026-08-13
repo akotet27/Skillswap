@@ -1,0 +1,12 @@
+{
+  "name": "SkillSwap",
+  "short_name": "SkillSwap",
+  "description": "Trade skills, not money — peer-to-peer mentorship with built-in video calls.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d111b",
+  "icons": [
+    { "src": "/logo-icon.png", "sizes": "87x87", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

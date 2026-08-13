@@ -1,0 +1,470 @@
+@import "./tokens.css";
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--text-body);
+  color: var(--text-primary);
+  background: var(--surface-alt);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 600;
+  color: var(--text-heading);
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-3);
+}
+h1 { font-size: var(--text-heading-lg); letter-spacing: -0.03em; }
+h2 { font-size: var(--text-heading); }
+h3 { font-size: var(--text-subheading); }
+p { margin: 0 0 var(--space-4); color: var(--text-secondary); line-height: 1.5; }
+
+a { color: var(--color-electric-blue); text-decoration: none; }
+/* Plain text links get an underline on hover; pill buttons (many of which
+   are <Link>s, not <button>s) never should -- they already signal
+   "interactive" via their filled/outlined pill shape. Drawer/menu rows
+   (.nav-dropdown-item) are the same story -- their own background-tint
+   hover state (see below) is the "interactive" signal, no underline on
+   top of it. */
+a:hover:not(.btn):not(.nav-dropdown-item) { text-decoration: underline; }
+
+/* Every interactive element gets a visible focus ring -- cross-cutting
+   requirement: keyboard accessibility. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-pill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.container {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+/* Primary nav: one floating rounded-pill container (per the latest
+   mockup) -- logo, links, and the CTA all live inside it, sticky near
+   the top of the viewport with a persistent ambient shadow. */
+.nav-wrap {
+  position: sticky;
+  top: var(--space-4);
+  z-index: 40;
+  padding: 0 var(--space-6);
+}
+.nav-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-6);
+  background: var(--nav-fill);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-float);
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+@media (max-width: 720px) {
+  .nav-links a:not(.btn) { display: none; } /* collapse secondary links on small screens, keep logo + primary action */
+}
+
+.nav-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-heading);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nav-menu-btn:hover { background: var(--surface); }
+
+/* Fixed panel pinned to the left edge of the viewport, independent of
+   scroll and of .app-shell. It doesn't float over the page -- .app-shell
+   shifts right by --drawer-width whenever this is open (see .shifted
+   below), so the menu makes room for itself instead of covering content. */
+:root {
+  --drawer-width: 264px;
+}
+.app-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--drawer-width);
+  padding: var(--space-6) var(--space-4);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-hover);
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+  z-index: 60;
+  overflow-y: auto;
+}
+.app-drawer.open { transform: translateX(0); }
+
+/* Wraps everything except the drawer -- shifting this over (rather than
+   the drawer floating with position:absolute) is what makes the open
+   menu push the page aside instead of covering it. */
+.app-shell {
+  transition: margin-left 0.22s ease;
+}
+.app-shell.shifted { margin-left: var(--drawer-width); }
+
+@media (max-width: 520px) {
+  :root { --drawer-width: 84vw; }
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--space-3);
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav-dropdown-item:hover { background: var(--surface-alt); color: var(--text-heading); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+  transition: box-shadow 0.15s ease;
+}
+.card:hover { box-shadow: var(--shadow-hover); }
+
+/* Form controls */
+.field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
+.field label { font-size: var(--text-body-sm); font-weight: 600; color: var(--text-heading); }
+/* .input is the standalone version -- same look as a .field's input, for
+   places (like SkillAutocompleteInput) that need the styled box without
+   the label/hint block .field also implies. */
+.field input, .field select, .field textarea, .input {
+  font: inherit;
+  font-size: var(--text-body);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--space-3);
+  background: var(--surface);
+  color: var(--text-primary);
+  width: 100%;
+  box-sizing: border-box;
+}
+.field input::placeholder, .field textarea::placeholder, .input::placeholder { color: var(--text-disabled); }
+/* Native <select> without this looks like a totally different, unstyled
+   control next to everything else on the page -- the browser draws its
+   own dropdown-arrow chrome regardless of the padding/border/radius
+   above, which is exactly the "doesn't match the rest of the app" gap.
+   The open dropdown *list* itself is still OS-native (unavoidable short
+   of a full custom listbox), but the closed box now matches every other
+   field. One fixed arrow color (not a token) since it's baked into a
+   data-URI, not real CSS -- chosen for enough contrast in both themes. */
+.field select, select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: var(--space-9);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235b6472' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-4) center;
+  cursor: pointer;
+}
+.field select:hover { border-color: var(--text-tertiary); }
+.field-error { color: var(--color-coral); font-size: var(--text-body-sm); }
+.field-hint { color: var(--text-tertiary); font-size: var(--text-body-sm); }
+
+/* Suggestion-dropdown rows (skill autocomplete, and anything else that
+   wants the same "list of clickable rows" look) -- explicit hover/focus
+   background so scrolling/arrowing through options is visibly trackable,
+   which a plain unstyled <button> never gave you. */
+.suggestion-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--space-2);
+  color: var(--text-primary);
+  font: inherit;
+}
+.suggestion-item:hover, .suggestion-item:focus-visible { background: var(--surface-alt); }
+.suggestion-item.suggestion-item-add { color: var(--color-electric-blue); font-weight: 600; }
+
+/* Segmented two-way toggle -- replaces a native <select> for binary
+   choices (teach vs. learn): a native select can't be given a custom
+   shape, hover state, or in-list styling at all, which was the actual
+   complaint (mismatched "box" next to the styled text input). */
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.segmented-btn {
+  border: none;
+  background: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segmented-btn:hover:not(.active) { color: var(--text-heading); }
+.segmented-btn.active { background: var(--color-midnight); color: #fff; }
+:root[data-theme="dark"] .segmented-btn.active { background: #fff; color: var(--color-midnight); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .segmented-btn.active { background: #fff; color: var(--color-midnight); }
+}
+
+/* Pill buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-6);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--text-body);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+/* Filled = the one primary action per screen (Find a Mentor, Join
+   SkillSwap, Save, Send, Accept, Book...); outline = everything secondary
+   (Offer a Skill, Log in, Cancel, Decline). Midnight-on-near-black has no
+   contrast in dark mode, so it inverts to near-white-on-Midnight-text
+   there rather than nearly disappearing. */
+.btn-primary { background: var(--color-midnight); color: #fff; }
+.btn-primary:hover:not(:disabled) { opacity: 0.9; }
+:root[data-theme="dark"] .btn-primary { background: #fff; color: var(--color-midnight); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn-primary { background: #fff; color: var(--color-midnight); }
+}
+.btn-secondary { background: transparent; color: var(--text-heading); border-color: var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--surface-alt); }
+.btn-block { width: 100%; }
+.btn-sm { padding: var(--space-2) var(--space-4); font-size: var(--text-body-sm); }
+.btn-danger { background: var(--color-danger); color: #fff; } /* Phase 4: hang-up */
+
+/* Teach / Learn tag chips */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.tag-teach { background: var(--color-teach-bg); color: var(--color-teach); border-color: var(--color-teach-line); }
+.tag-learn { background: var(--color-learn-bg); color: var(--color-learn); border-color: var(--color-learn-line); }
+.tag-neutral { background: var(--surface-alt); color: var(--text-secondary); border-color: var(--border); }
+
+.eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+}
+
+.signature { font-family: var(--font-signature); font-weight: 600; }
+
+/* Chat bubbles: "mine" reuses the primary-button fill (Midnight, same
+   dark-mode inversion) so a glance at color alone tells you who sent what. */
+.chat-bubble { border-radius: var(--space-4); padding: var(--space-3) var(--space-4); }
+.chat-bubble-mine { background: var(--color-midnight); color: #fff; }
+.chat-bubble-theirs { background: var(--surface-alt); color: var(--text-primary); }
+:root[data-theme="dark"] .chat-bubble-mine { background: #fff; color: var(--color-midnight); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chat-bubble-mine { background: #fff; color: var(--color-midnight); }
+}
+
+.error-banner {
+  background: #fdeceb;
+  border: 1px solid var(--color-coral);
+  color: #a33b3b;
+  border-radius: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-body-sm);
+  margin-bottom: var(--space-5);
+}
+:root[data-theme="dark"] .error-banner { background: #2a1414; color: #ff9b9b; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .error-banner { background: #2a1414; color: #ff9b9b; }
+}
+
+/* Homepage hero: two columns on wide viewports, stacked below ~900px */
+.hero-grid { grid-template-columns: 1.1fr 0.9fr; }
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; }
+}
+
+/* Marketing page sections alternate white / snow backgrounds -- one
+   place to control that rhythm rather than repeating it inline per
+   section on the homepage. */
+.section { padding: var(--space-20) 0; }
+.section-alt { background: var(--surface-alt); }
+
+/* Some marketing illustrations (Trust and Credits, Seamless Skill
+   Matching) are raster images with real alpha transparency around fixed
+   dark-navy text/line-art baked into the pixels -- great on a light
+   page, illegible on a dark one, since the text color can't respond to
+   the theme toggle. Rather than leave them floating transparently (fine
+   in light mode, broken in dark), they get an explicit *always-light*
+   frame -- deliberately `#fff`/fixed grey, not `var(--surface)`, so it
+   does not flip dark. This is a conscious choice: these specific
+   illustrations don't adapt to dark mode, framed consistently instead. */
+/* Split layout for the auth pages (/login, /signup) -- MatchClusterIllustration
+   on the left, form on the right. `order` (not JSX order) puts the
+   illustration first visually while keeping it last in markup, so it's
+   still the last thing a keyboard/screen-reader user reaches -- it's
+   decorative, not primary content. It's also the first thing dropped on
+   narrower viewports rather than squeezing the actual form. */
+.auth-split {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-16);
+}
+.auth-illustration {
+  order: -1;
+  flex: 1;
+  max-width: 420px;
+  display: none;
+}
+@media (min-width: 960px) {
+  .auth-illustration { display: block; }
+}
+
+.illustration-frame {
+  background: #ffffff;
+  border: 1px solid #e2e4ec;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  padding: var(--space-6);
+  overflow: hidden;
+}
+
+/* Mocked browser-window chrome, used for the Phase-4 video-session
+   preview on the homepage -- a UI-artifact mockup, not a screenshot. */
+.browser-frame {
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-float);
+  background: var(--surface);
+}
+.browser-frame-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+.browser-frame-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--color-mist); }
+
+/* Dark footer -- the one place on the homepage that goes full-dark
+   regardless of the light/dark theme toggle, matching the mockup. */
+.site-footer { background: var(--color-midnight); color: #fff; padding: var(--space-16) 0 var(--space-8); }
+.site-footer h4 { color: #fff; font-size: var(--text-body-sm); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--space-4); }
+.site-footer a { color: rgba(255, 255, 255, 0.65); display: block; margin-bottom: var(--space-2); }
+.site-footer a:hover { color: #fff; }
+/* Bottom icon row -- overrides the block/margin-bottom above, which is
+   meant for the stacked text-link columns, not this inline row. */
+.footer-icon-link {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0 !important;
+  color: rgba(255, 255, 255, 0.65);
+}
+.footer-icon-link:hover { color: #fff; }
+
+/* Phase 4: video call room controls + effects */
+.btn-round {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-round:hover { background: rgba(255, 255, 255, 0.2); }
+.btn-round-off { background: #fff; color: var(--color-midnight); }
+.btn-round-off:hover { background: #e5e7eb; }
+.btn-round-danger { background: var(--color-danger); }
+.btn-round-danger:hover { background: #d94347; }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.floating-reaction {
+  animation: float-up 3s ease-out forwards;
+}
+@keyframes float-up {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  15% { opacity: 1; transform: translateY(-20px) scale(1); }
+  100% { opacity: 0; transform: translateY(-180px) scale(1.1); }
+}
+
+/* Responsive: mobile-first, tested down to ~360px */
+@media (max-width: 480px) {
+  .container { padding: 0 var(--space-4); }
+  h1 { font-size: var(--text-heading); }
+}

@@ -1,0 +1,40 @@
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+backend/.env
+backend/*.sqlite3
+
+# --- Alembic ---
+# (versions are tracked; local sqlite artifacts are not)
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# --- Env files (real secrets never committed) ---
+.env
+.env.local
+*.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+npm-debug.log*
+
+# --- Uploads (local dev media, not source) ---
+backend/uploads/

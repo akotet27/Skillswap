@@ -1,0 +1,42 @@
+# Pinned to versions confirmed to actually install and run against this
+# Python (developed/tested on 3.14, released recently enough that several
+# originally-chosen pins had no prebuilt wheel yet and fell back to
+# source builds requiring toolchains this machine doesn't have -- Rust
+# for pydantic-core, Postgres dev headers for psycopg2, etc.). If you're
+# on an older, more established Python (3.11/3.12), the original looser
+# pins would likely also work, but these are the ones actually verified
+# here end-to-end against real Postgres + Redis containers.
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+sqlalchemy==2.0.51
+alembic==1.19.0
+# psycopg3, not psycopg2-binary: psycopg2-binary has no prebuilt wheel for
+# very new Python versions (confirmed failing on 3.14 -- pip falls back to
+# building from source, which needs pg_config/Postgres dev headers most
+# dev machines don't have). psycopg3 ships wheels much faster after a new
+# Python release and is SQLAlchemy 2.0's recommended driver. Dialect
+# string is `postgresql+psycopg://` (not `+psycopg2`) wherever this is used.
+psycopg[binary]==3.3.4
+pydantic==2.13.4
+email-validator==2.3.0
+pydantic-settings==2.14.2
+redis==8.1.0
+celery==5.6.3
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+# Pinned <4.1 on purpose: passlib 1.7.4 (its last release) predates a
+# bcrypt error-message change in 4.1+ that its backend-detection code
+# doesn't catch, crashing on the *first* hash/verify call with
+# "password cannot be longer than 72 bytes" even for short passwords.
+# Confirmed by hitting this exact crash in this project -- do not
+# `pip install -U bcrypt` without re-testing password hashing first.
+bcrypt==4.0.1
+authlib==1.7.2
+httpx==0.28.1
+itsdangerous==2.2.0
+pyotp==2.10.0
+python-multipart==0.0.32
+slowapi==0.1.10
+Jinja2==3.1.6
+ics==0.7.3
+python-dotenv==1.2.2
