@@ -7,7 +7,12 @@
 [build]
   base = "frontend"
   command = "pnpm install && pnpm run build"
-  publish = "frontend/dist"
+  # Relative to `base` above, not the repo root -- Netlify resolves `publish`
+  # underneath `base` once it's set, so this is frontend/dist in practice,
+  # not frontend/frontend/dist. Learned the hard way: a first attempt at
+  # "frontend/dist" here resolved to a nonexistent frontend/frontend/dist
+  # and failed the deploy with "Deploy directory ... does not exist".
+  publish = "dist"
 
 # Client-side routing (react-router's BrowserRouter) -- every path has to
 # resolve to index.html so a hard refresh on e.g. /sessions doesn't 404,
