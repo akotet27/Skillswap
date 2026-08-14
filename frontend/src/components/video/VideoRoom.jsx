@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Send, Smile, UserPlus, Loader2, AlertTriangle, MonitorUp } from "lucide-react";
 import { useWebRTCRoom } from "../../webrtc/useWebRTCRoom";
 import VideoTile from "./VideoTile";
 
 const QUICK_REACTIONS = ["👍", "🎉", "😂", "❤️", "👏", "🙌", "🔥", "😮", "👋", "😢"];
 
-export default function VideoRoom({ roomId, token, guestToken, guestName, selfName, onLeave, onInviteGuest }) {
+export default function VideoRoom({ roomId, token, guestToken, guestName, selfName, onLeave, onInviteGuest, compact = false }) {
   const {
     connectionState,
     selfId,
@@ -29,6 +29,24 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
 
   const [chatOpen, setChatOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [unseenChat, setUnseenChat] = useState(0);
+  const seenCountRef = useRef(0); // how many chatMessages we've already accounted for
+
+  // Dot on the chat toggle for messages that arrive while the panel is
+  // closed -- otherwise a message from the other person just silently
+  // sits in chatMessages with nothing on screen hinting it's there,
+  // since this panel isn't open like the main chat page is.
+  useEffect(() => {
+    const newOnes = chatMessages.slice(seenCountRef.current);
+    seenCountRef.current = chatMessages.length;
+    if (chatOpen || newOnes.length === 0) return;
+    const fromOthers = newOnes.filter((m) => m.from !== selfId).length;
+    if (fromOthers > 0) setUnseenChat((n) => n + fromOthers);
+  }, [chatMessages, chatOpen, selfId]);
+
+  useEffect(() => {
+    if (chatOpen) setUnseenChat(0);
+  }, [chatOpen]);
 
   function submitChat(e) {
     e.preventDefault();
@@ -98,7 +116,27 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
         ))}
       </div>
 
-      {screenShareActive ? (
+      {compact ? (
+        // Minimized/PiP mode: always the "one big tile + small self corner"
+        // layout regardless of screen-share state -- whoever you're
+        // talking to matters more than your own feed when this is just a
+        // small floating window, and a full grid of tiles doesn't fit a
+        // few hundred px wide anyway.
+        <div style={{ position: "relative" }}>
+          {screenShareActive ? (
+            <VideoTile stream={screenStream} name="Screen" status="Sharing screen" style={{ aspectRatio: "16 / 10" }} />
+          ) : remoteEntries.length > 0 ? (
+            <VideoTile stream={remoteEntries[0][1].stream} name={remoteEntries[0][1].name} publishState={publishStates.get(remoteEntries[0][0])} style={{ aspectRatio: "16 / 10" }} />
+          ) : (
+            <VideoTile stream={localStream} name={selfName} isLocal cameraOn={cameraEnabled} style={{ aspectRatio: "16 / 10" }} />
+          )}
+          {(screenShareActive || remoteEntries.length > 0) && (
+            <div style={{ position: "absolute", right: 8, bottom: 8, width: "clamp(70px, 30%, 100px)", boxShadow: "var(--shadow-hover)", borderRadius: "var(--space-2)", overflow: "hidden" }}>
+              <VideoTile stream={localStream} name={selfName} isLocal cameraOn={cameraEnabled} style={{ aspectRatio: "4 / 3" }} />
+            </div>
+          )}
+        </div>
+      ) : screenShareActive ? (
         <div style={{ padding: "var(--space-2)" }}>
           <div style={{ position: "relative" }}>
             <VideoTile stream={screenStream} name="Your screen" status="Sharing screen" style={{ aspectRatio: "16 / 10" }} />
@@ -135,34 +173,49 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
         </div>
       )}
 
-      {/* control bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--space-3)", padding: "var(--space-4)" }}>
+      {/* control bar -- compact mode keeps only the essentials (mic,
+          camera, leave); screen share, chat, reactions, and invite are
+          all still reachable by expanding back to the full view. */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "var(--space-3)", padding: compact ? "var(--space-2)" : "var(--space-4)" }}>
         <button className={`btn-round ${!micEnabled ? "btn-round-off" : ""}`} onClick={toggleMic} aria-label={micEnabled ? "Mute microphone" : "Unmute microphone"}>
           {micEnabled ? <Mic size={18} /> : <MicOff size={18} />}
         </button>
         <button className={`btn-round ${!cameraEnabled ? "btn-round-off" : ""}`} onClick={toggleCamera} aria-label={cameraEnabled ? "Turn camera off" : "Turn camera on"}>
           {cameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
         </button>
-        <button className={`btn-round ${screenSharing ? "btn-round-off" : ""}`} onClick={toggleScreenShare} aria-label={screenSharing ? "Stop sharing your screen" : "Share your screen"}>
-          <MonitorUp size={18} />
-        </button>
-        <button className="btn-round" onClick={() => setChatOpen((v) => !v)} aria-label="Toggle chat">
-          <Send size={18} />
-        </button>
-        <div style={{ position: "relative" }}>
-          <ReactionPicker onPick={sendReaction} />
-        </div>
-        {onInviteGuest && (
-          <button className="btn-round" onClick={onInviteGuest} aria-label="Invite a guest">
-            <UserPlus size={18} />
-          </button>
+        {!compact && (
+          <>
+            <button className={`btn-round ${screenSharing ? "btn-round-off" : ""}`} onClick={toggleScreenShare} aria-label={screenSharing ? "Stop sharing your screen" : "Share your screen"}>
+              <MonitorUp size={18} />
+            </button>
+            <button className="btn-round" onClick={() => setChatOpen((v) => !v)} aria-label="Toggle chat" style={{ position: "relative" }}>
+              <Send size={18} />
+              {unseenChat > 0 && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute", top: 2, right: 2, width: 10, height: 10, borderRadius: "999px",
+                    background: "var(--color-coral)", border: "2px solid var(--color-midnight)",
+                  }}
+                />
+              )}
+            </button>
+            <div style={{ position: "relative" }}>
+              <ReactionPicker onPick={sendReaction} />
+            </div>
+            {onInviteGuest && (
+              <button className="btn-round" onClick={onInviteGuest} aria-label="Invite a guest">
+                <UserPlus size={18} />
+              </button>
+            )}
+          </>
         )}
         <button className="btn-round btn-round-danger" onClick={leave} aria-label="Leave call">
           <PhoneOff size={18} />
         </button>
       </div>
 
-      {chatOpen && (
+      {!compact && chatOpen && (
         <div style={{ background: "var(--surface)", borderTop: "1px solid var(--border)", maxHeight: 240, display: "flex", flexDirection: "column" }}>
           <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             {chatMessages.length === 0 && <p className="field-hint" style={{ margin: 0 }}>No messages yet.</p>}
@@ -173,7 +226,7 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
             ))}
           </div>
           <form onSubmit={submitChat} style={{ display: "flex", gap: "var(--space-2)", padding: "var(--space-2) var(--space-3)" }}>
-            <input placeholder="Send a message…" value={draft} onChange={(e) => setDraft(e.target.value)} style={{ flex: 1 }} />
+            <input className="input" placeholder="Send a message…" value={draft} onChange={(e) => setDraft(e.target.value)} style={{ flex: 1 }} />
             <button className="btn btn-primary btn-sm">Send</button>
           </form>
         </div>

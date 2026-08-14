@@ -19,11 +19,15 @@ def upgrade() -> None:
     op.create_table(
         "user_badges",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey(
+            "users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("badge_key", sa.String(length=64), nullable=False),
-        sa.Column("earned_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.CheckConstraint("badge_key <> ''", name="ck_user_badges_badge_key_nonempty"),
-        sa.UniqueConstraint("user_id", "badge_key", name="uq_user_badges_once_per_badge"),
+        sa.Column("earned_at", sa.DateTime(timezone=True),
+                  server_default=sa.func.now()),
+        sa.CheckConstraint("badge_key <> ''",
+                           name="ck_user_badges_badge_key_nonempty"),
+        sa.UniqueConstraint("user_id", "badge_key",
+                            name="uq_user_badges_once_per_badge"),
     )
     op.create_index("ix_user_badges_user_id", "user_badges", ["user_id"])
     op.create_index("ix_user_badges_badge_key", "user_badges", ["badge_key"])

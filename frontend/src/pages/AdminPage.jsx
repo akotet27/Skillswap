@@ -48,7 +48,7 @@ function ReportsTab() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
         <p className="field-hint" style={{ margin: 0 }}>
           {showAll ? "All reports, oldest first" : "Open reports, oldest first"}
         </p>
@@ -322,7 +322,7 @@ export default function AdminPage() {
       <p className="eyebrow">Moderation</p>
       <h1>Admin</h1>
 
-      <div role="tablist" style={{ display: "flex", gap: "var(--space-2)", margin: "var(--space-5) 0" }}>
+      <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", margin: "var(--space-5) 0" }}>
         <button
           role="tab"
           aria-selected={tab === "reports"}

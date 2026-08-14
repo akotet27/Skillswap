@@ -3,11 +3,13 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { SidebarProvider, useSidebar } from "./context/SidebarContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
+import { CallProvider } from "./context/CallContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
 import SidebarDrawer from "./components/SidebarDrawer";
 import AppSidebar from "./components/AppSidebar";
 import MessageToast from "./components/MessageToast";
+import PersistentCallOverlay from "./components/PersistentCallOverlay";
 
 // The login page is a deliberate exception to the guest nav -- it wants
 // a minimal, focused frame (just a way back home), not the full pill nav
@@ -47,6 +49,7 @@ function AppRoot({ children }) {
         <AppSidebar />
         <div className="app-shell authed">{children}</div>
         <MessageToast />
+        <PersistentCallOverlay />
       </>
     );
   }
@@ -78,7 +81,7 @@ import BrowsePage from "./pages/BrowsePage";
 import BookingPage from "./pages/BookingPage";
 import RequestsPage from "./pages/RequestsPage";
 import SessionsPage from "./pages/SessionsPage";
-import ConversationsPage from "./pages/ConversationsPage";
+import MessagesLayout from "./pages/MessagesLayout";
 import ChatPage from "./pages/ChatPage";
 import SessionRoomPage from "./pages/SessionRoomPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
@@ -96,6 +99,7 @@ export default function App() {
       >
         <AuthProvider>
           <NotificationsProvider>
+          <CallProvider>
           <SidebarProvider>
             <AppRoot>
               <Routes>
@@ -178,18 +182,12 @@ export default function App() {
                   path="/messages"
                   element={
                     <ProtectedRoute>
-                      <ConversationsPage />
+                      <MessagesLayout />
                     </ProtectedRoute>
                   }
-                />
-                <Route
-                  path="/messages/:conversationId"
-                  element={
-                    <ProtectedRoute>
-                      <ChatPage />
-                    </ProtectedRoute>
-                  }
-                />
+                >
+                  <Route path=":conversationId" element={<ChatPage />} />
+                </Route>
                 <Route
                   path="/session/:sessionId"
                   element={
@@ -209,6 +207,7 @@ export default function App() {
               </Routes>
             </AppRoot>
           </SidebarProvider>
+          </CallProvider>
           </NotificationsProvider>
         </AuthProvider>
       </BrowserRouter>

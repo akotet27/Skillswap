@@ -14,7 +14,7 @@ export default function Navbar() {
 
   return (
     <div className="nav-wrap">
-      <nav className="nav-pill">
+      <nav className="nav-bar-inner">
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
           <button
             type="button"

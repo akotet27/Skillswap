@@ -23,14 +23,10 @@ h2 { font-size: var(--text-heading); }
 h3 { font-size: var(--text-subheading); }
 p { margin: 0 0 var(--space-4); color: var(--text-secondary); line-height: 1.5; }
 
+/* No underline anywhere, hover included -- interactive state is
+   communicated by color/background changes (pill shape, background-tint
+   rows, etc.), not underlining. */
 a { color: var(--color-electric-blue); text-decoration: none; }
-/* Plain text links get an underline on hover; pill buttons (many of which
-   are <Link>s, not <button>s) never should -- they already signal
-   "interactive" via their filled/outlined pill shape. Drawer/menu rows
-   (.nav-dropdown-item) are the same story -- their own background-tint
-   hover state (see below) is the "interactive" signal, no underline on
-   top of it. */
-a:hover:not(.btn):not(.nav-dropdown-item) { text-decoration: underline; }
 
 /* Every interactive element gets a visible focus ring -- cross-cutting
    requirement: keyboard accessibility. */
@@ -56,32 +52,32 @@ select:focus-visible,
 
 .container {
   width: 100%;
-  max-width: 1120px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 0 var(--space-6);
 }
 
-/* Primary nav: one floating rounded-pill container (per the latest
-   mockup) -- logo, links, and the CTA all live inside it, sticky near
-   the top of the viewport with a persistent ambient shadow. */
+/* Primary nav: a flat, edge-to-edge bar (not a floating rounded pill --
+   that read as blending into the page and was dropped) -- flush with the
+   very top and both edges of the viewport, with a hairline bottom border
+   as the only separator from the page below. Logo/links/CTA live in an
+   inner content wrapper capped at the same max-width as everything else,
+   so the *content* still aligns even though the bar itself is full-bleed. */
 .nav-wrap {
   position: sticky;
-  top: var(--space-4);
+  top: 0;
   z-index: 40;
-  padding: 0 var(--space-6);
+  background: var(--nav-fill);
+  border-bottom: 1px solid var(--border);
 }
-.nav-pill {
+.nav-bar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  max-width: 1120px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-6);
-  background: var(--nav-fill);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-float);
+  padding: var(--space-4) var(--space-6);
 }
 .nav-links {
   display: flex;
@@ -165,7 +161,11 @@ select:focus-visible,
     bottom: 0;
     width: var(--sidebar-width);
     padding: var(--space-6) var(--space-4);
-    background: var(--surface);
+    /* A dedicated nav-region shade, not the same token the content pane
+       next to it uses -- otherwise the sidebar and whatever page you're
+       on visually merge into one flat slab of color with nothing to
+       mark where the nav rail ends and the page begins. */
+    background: var(--nav-fill);
     border-right: 1px solid var(--border);
     z-index: 50;
     gap: var(--space-1);
@@ -237,7 +237,7 @@ select:focus-visible,
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--surface);
+  background: var(--nav-fill); /* matches the desktop sidebar's nav-region shade */
   border-top: 1px solid var(--border);
   z-index: 50;
   padding: var(--space-2) 0;
@@ -329,6 +329,147 @@ select:focus-visible,
   .home-grid { grid-template-columns: 1fr 300px; align-items: start; }
   .home-rail { order: 0; position: sticky; top: var(--space-8); }
 }
+
+/* Home rail stat card + stat list -- small pill tag, a big bold headline
+   number, and (for stats/badges) rounded list rows with an icon badge
+   instead of a bare flex row of label/value pairs. */
+.stat-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-size: var(--text-eyebrow);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.stat-card-value {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-heading);
+  font-weight: 700;
+  color: var(--color-electric-blue);
+  letter-spacing: -0.02em;
+}
+
+/* Insight card: status pill + corner arrow up top, headline number with
+   a small trend mark down at the bottom next to a brand mark -- the
+   "insights" card layout from the reference mockup, adapted to real
+   credit data instead of a fabricated stat. */
+.insight-card { padding: var(--space-6); position: relative; overflow: hidden; }
+.insight-card-top { display: flex; justify-content: space-between; align-items: center; }
+.insight-card-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  color: var(--text-heading);
+}
+.insight-card-arrow:hover { background: var(--border); }
+.insight-card-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-heading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+/* A small colored triangle, same idea as the reference card's up/down
+   trend indicator next to its headline number. */
+.insight-card-trend {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+}
+.insight-card-trend.up { border-bottom: 8px solid var(--color-leaf); }
+.insight-card-trend.down { border-top: 8px solid var(--color-coral); }
+
+.stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.stat-list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--space-3);
+  background: var(--surface-alt);
+  text-decoration: none;
+  color: inherit;
+}
+a.stat-list-row:hover { background: var(--border); }
+.stat-list-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--space-2);
+  flex-shrink: 0;
+}
+.stat-list-label { flex: 1; font-weight: 600; font-size: var(--text-body-sm); }
+.stat-list-count { font-weight: 700; color: var(--text-heading); }
+.stat-list-arrow { color: var(--text-tertiary); flex-shrink: 0; }
+
+/* Messages: WhatsApp/Telegram-style split view (see MessagesLayout.jsx)
+   -- a list pane and a chat pane sharing the viewport, not two separate
+   full pages. `--space-*`-scale height math mirrors .app-shell.authed's
+   own padding-bottom/margin breakpoint exactly, so this fills the space
+   the shell actually leaves available at each width. */
+.messages-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+@media (max-width: 859px) {
+  .messages-layout { height: calc(100vh - 72px); }
+}
+
+.messages-list-pane {
+  width: 100%;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--surface);
+}
+.messages-chat-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (min-width: 860px) {
+  .messages-list-pane { width: 360px; }
+}
+/* Narrow: one pane at a time -- list until a conversation is opened,
+   then the chat (with a back arrow inside it to return to the list). */
+@media (max-width: 859px) {
+  .messages-chat-pane { display: none; }
+  .messages-layout.has-active-chat .messages-list-pane { display: none; }
+  .messages-layout.has-active-chat .messages-chat-pane { display: flex; }
+}
+
+.conversation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  color: inherit;
+  text-decoration: none;
+}
+.conversation-row:hover { background: var(--surface-alt); }
+.conversation-row.active { background: var(--surface-alt); }
 
 .nav-dropdown-item {
   display: flex;
@@ -516,6 +657,37 @@ select:focus-visible,
   :root:not([data-theme="light"]) .chat-bubble-mine { background: #fff; color: var(--color-midnight); }
 }
 
+/* Back arrow into the conversation list -- always shown (not just on
+   narrow viewports where the chat pane takes over the whole screen):
+   also doubles as the visible affordance for "close this chat", same
+   action as pressing Esc (see ChatPage.jsx). */
+.chat-back-btn { display: flex; align-items: center; color: inherit; }
+
+/* Edit/delete icons on your own messages -- small and low-contrast by
+   default so the transcript doesn't look cluttered with controls, a
+   touch target big enough to tap reliably on mobile (no hover state to
+   rely on there, unlike desktop). */
+.chat-message-row { position: relative; }
+.chat-message-actions {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+  margin-bottom: 2px;
+}
+.chat-message-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--space-2);
+}
+.chat-message-actions button:hover { background: var(--surface-alt); color: var(--text-heading); }
+
 .error-banner {
   background: #fdeceb;
   border: 1px solid var(--color-coral);
@@ -608,6 +780,19 @@ select:focus-visible,
 /* Dark footer -- the one place on the homepage that goes full-dark
    regardless of the light/dark theme toggle, matching the mockup. */
 .site-footer { background: var(--color-midnight); color: #fff; padding: var(--space-16) 0 var(--space-8); }
+/* On the light theme the footer deliberately stays dark (a fixed brand
+   anchor, same as a primary button) -- but on the dark theme the whole
+   page is already dark, so there's no reason for the footer to hold out
+   as a *different*, unrelated dark shade. --surface-alt (tried first)
+   and --nav-fill (tried second) are both the same token `body` itself
+   uses in the current dark palette, so either one just made the footer
+   disappear into the page. --surface is the one guaranteed to differ
+   from the page background -- it's what .card already uses to stand
+   out against `body`, same job the footer needs here. */
+:root[data-theme="dark"] .site-footer { background: var(--surface); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .site-footer { background: var(--surface); }
+}
 .site-footer h4 { color: #fff; font-size: var(--text-body-sm); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--space-4); }
 .site-footer a { color: rgba(255, 255, 255, 0.65); display: block; margin-bottom: var(--space-2); }
 .site-footer a:hover { color: #fff; }
@@ -644,6 +829,59 @@ select:focus-visible,
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Persistent call overlay (see PersistentCallOverlay.jsx / CallContext.jsx)
+   -- one <VideoRoom/> instance that outlives route navigation. Full-size
+   takes over the whole viewport (simpler and more focused than trying to
+   fit inside the normal sidebar-offset content column, and matches how
+   Zoom/Meet take over the screen for an active call); minimized shrinks
+   to a small floating window that stays on top of whatever page you're
+   actually on. */
+.call-full-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 190; /* below .message-toast (200) -- a new-message toast should still surface over a full-screen call */
+  background: var(--surface-alt);
+  overflow-y: auto;
+}
+
+.call-pip {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  width: 260px;
+  z-index: 210;
+  background: var(--color-midnight);
+  border-radius: var(--space-3);
+  overflow: hidden;
+  box-shadow: var(--shadow-hover);
+}
+@media (max-width: 859px) {
+  .call-pip { bottom: calc(64px + var(--space-4)); } /* clear the mobile bottom tab bar */
+}
+.call-pip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+}
+.call-pip-header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--space-2);
+  cursor: pointer;
+}
+.call-pip-header button:hover { background: rgba(255, 255, 255, 0.22); }
 
 .floating-reaction {
   animation: float-up 3s ease-out forwards;

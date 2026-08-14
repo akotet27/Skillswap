@@ -64,7 +64,8 @@ def list_users(db: DbSession = Depends(get_db), limit: int = 100, offset: int = 
 @router.get("/login-audit", response_model=list[LoginAuditOut], dependencies=[Depends(get_current_admin)])
 def list_login_audit(db: DbSession = Depends(get_db), limit: int = 100, offset: int = 0):
     return db.scalars(
-        select(LoginAudit).order_by(LoginAudit.created_at.desc()).limit(limit).offset(offset)
+        select(LoginAudit).order_by(
+            LoginAudit.created_at.desc()).limit(limit).offset(offset)
     ).all()
 
 
@@ -77,7 +78,8 @@ def get_analytics(db: DbSession = Depends(get_db)):
         signups_over_time=analytics_service.signups_over_time(db),
         top_taught_skills=analytics_service.top_taught_skills(db),
         top_wanted_skills=analytics_service.top_wanted_skills(db),
-        avg_time_to_first_match_hours=analytics_service.avg_time_to_first_match_hours(db),
+        avg_time_to_first_match_hours=analytics_service.avg_time_to_first_match_hours(
+            db),
         sessions_completed=analytics_service.sessions_completed_count(db),
         credits_in_circulation=analytics_service.credits_in_circulation(db),
     )
@@ -114,7 +116,8 @@ def suspend_user(user_id: int, db: DbSession = Depends(get_db)):
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     if user.is_admin:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Can't suspend an admin account")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "Can't suspend an admin account")
     user.is_active = False
     db.commit()
     db.refresh(user)
@@ -136,7 +139,8 @@ def unsuspend_user(user_id: int, db: DbSession = Depends(get_db)):
 def adjust_user_credits(user_id: int, payload: CreditAdjustmentRequest, db: DbSession = Depends(get_db)):
     if db.get(User, user_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    credits_service.apply_admin_adjustment(db, user_id, payload.amount, payload.reason)
+    credits_service.apply_admin_adjustment(
+        db, user_id, payload.amount, payload.reason)
     db.commit()
     return {
         "balance": credits_service.get_balance(db, user_id),

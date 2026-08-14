@@ -13,6 +13,18 @@ class MessageOut(BaseModel):
     type: MessageType
     content: str | None
     content_url: str | None
+    # E2E encrypted chat: set means `content` is base64 AES-GCM ciphertext
+    # the client must decrypt (see frontend/src/crypto/e2e.js); null means
+    # `content` is plain text as before (legacy message, or sent before
+    # either side had a public key on file).
+    iv: str | None
+    # Only meaningful for type == "file" -- see Message.file_* in
+    # models/messaging.py.
+    file_name: str | None = None
+    file_size: int | None = None
+    file_mime: str | None = None
+    edited_at: datetime | None = None
+    deleted_at: datetime | None = None
     created_at: datetime
 
     class Config:

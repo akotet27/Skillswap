@@ -49,6 +49,8 @@ def update_me(payload: UserUpdate, user: User = Depends(get_current_user), db: D
         user.timezone = payload.timezone
     if payload.age is not None:
         user.age = payload.age
+    if payload.public_key is not None:
+        user.public_key = payload.public_key
     db.commit()
     return user
 
@@ -195,23 +197,27 @@ def _summarize_availability(blocks: list[Availability]) -> str | None:
 
 @router.get("/me/skills", response_model=list[UserSkillOut])
 def list_my_skills(user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
-    links = db.scalars(select(UserSkill).where(UserSkill.user_id == user.id)).all()
+    links = db.scalars(select(UserSkill).where(
+        UserSkill.user_id == user.id)).all()
 
     # has_teacher is only meaningful for 'want' rows -- it's what drives the
     # "notify me" prompt on the profile editor (see skills.py's waitlist
     # endpoints). One query for every wanted skill_id rather than N+1.
-    want_skill_ids = {link.skill_id for link in links if link.type == SkillType.WANT}
+    want_skill_ids = {
+        link.skill_id for link in links if link.type == SkillType.WANT}
     taught_skill_ids = set()
     if want_skill_ids:
         taught_skill_ids = set(
             db.scalars(
                 select(UserSkill.skill_id).where(
-                    UserSkill.skill_id.in_(want_skill_ids), UserSkill.type == SkillType.HAVE
+                    UserSkill.skill_id.in_(
+                        want_skill_ids), UserSkill.type == SkillType.HAVE
                 )
             ).all()
         )
     for link in links:
-        link.has_teacher = (link.skill_id in taught_skill_ids) if link.type == SkillType.WANT else None
+        link.has_teacher = (
+            link.skill_id in taught_skill_ids) if link.type == SkillType.WANT else None
     return links
 
 

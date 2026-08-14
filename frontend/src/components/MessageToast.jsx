@@ -1,14 +1,17 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, MessageSquare } from "lucide-react";
+import { X, MessageSquare, Handshake } from "lucide-react";
 import { useNotifications } from "../context/NotificationsContext";
 
 const AUTO_DISMISS_MS = 6000;
+const ICONS = { message: MessageSquare, request: Handshake };
 
-/** Brief popup for an incoming message when you're not already looking
- * at that conversation -- sender, short preview, Open action, dismiss,
- * auto-dismisses if ignored. Rendered once at the app root (see
- * App.jsx) so it can appear over any authenticated page. */
+/** Brief popup for an incoming message or swap request when you're not
+ * already looking at the relevant page -- sender, short preview, Open
+ * action, dismiss, auto-dismisses if ignored. Rendered once at the app
+ * root (see App.jsx) so it can appear over any authenticated page. One
+ * shared toast for both kinds (see NotificationsContext.jsx), not two
+ * parallel popup systems. */
 export default function MessageToast() {
   const { toast, dismissToast } = useNotifications();
   const navigate = useNavigate();
@@ -21,11 +24,13 @@ export default function MessageToast() {
 
   if (!toast) return null;
 
+  const Icon = ICONS[toast.kind] || MessageSquare;
+
   return (
     <div className="message-toast" role="status">
-      <MessageSquare size={18} style={{ color: "var(--color-electric-blue)", flexShrink: 0, marginTop: 2 }} />
+      <Icon size={18} style={{ color: "var(--color-electric-blue)", flexShrink: 0, marginTop: 2 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <strong style={{ display: "block", fontSize: "var(--text-body-sm)" }}>{toast.senderName}</strong>
+        <strong style={{ display: "block", fontSize: "var(--text-body-sm)" }}>{toast.title}</strong>
         <p style={{ margin: "2px 0 0", fontSize: "var(--text-body-sm)", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {toast.preview}
         </p>
@@ -35,7 +40,7 @@ export default function MessageToast() {
           style={{ marginTop: "var(--space-3)" }}
           onClick={() => {
             dismissToast();
-            navigate(`/messages/${toast.conversationId}`);
+            navigate(toast.navigateTo);
           }}
         >
           Open

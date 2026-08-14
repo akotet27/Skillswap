@@ -18,7 +18,8 @@ def award_session_badges(session_id: int) -> list[str]:
         if session is None:
             return []
         awarded: list[str] = []
-        participant_ids = db.scalars(select(SessionParticipant.user_id).where(SessionParticipant.session_id == session_id)).all()
+        participant_ids = db.scalars(select(SessionParticipant.user_id).where(
+            SessionParticipant.session_id == session_id)).all()
         for user_id in participant_ids:
             awarded.extend(award_badges_for_user(db, user_id))
         db.commit()

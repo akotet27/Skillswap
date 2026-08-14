@@ -1,24 +1,27 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Copy, Check } from "lucide-react";
 import { apiJson } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import VideoRoom from "../components/video/VideoRoom";
+import { useCall } from "../context/CallContext";
 
+/** This page's only job now is the *pre-call* setup (load the session,
+ * ask a guest for their name) and then handing off to CallContext -- the
+ * actual call UI is drawn by PersistentCallOverlay.jsx, mounted once at
+ * the app root so it survives navigating away from this route entirely
+ * (see CallContext.jsx). Once startCall() fires, this page has nothing
+ * left to render; the overlay takes over visually. */
 export default function SessionRoomPage() {
   const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
   const guestToken = searchParams.get("guest_token");
   const guestRoom = searchParams.get("room");
   const { user } = useAuth();
+  const { activeCall, startCall, restore } = useCall();
 
   const [session, setSession] = useState(null);
   const [error, setError] = useState("");
   const [guestNameInput, setGuestNameInput] = useState("");
   const [guestReady, setGuestReady] = useState(false);
-  const [inviteUrl, setInviteUrl] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const [left, setLeft] = useState(false);
 
   const isGuestFlow = !!guestToken;
 
@@ -29,31 +32,35 @@ export default function SessionRoomPage() {
       .catch((e) => setError(e.message));
   }, [sessionId, isGuestFlow]);
 
-  async function inviteGuest() {
-    setError("");
-    try {
-      const res = await apiJson(`/api/sessions/${sessionId}/guest-invite`, { method: "POST" });
-      setInviteUrl(res.join_url);
-      setCopied(false);
-    } catch (e) {
-      setError(e.message);
+  // Hand off to CallContext once we have what we need. If this exact
+  // call is already active (e.g. it was minimized and they navigated
+  // back), just bring it back to full size instead of tearing down and
+  // reconnecting the WebRTC session from scratch.
+  useEffect(() => {
+    if (isGuestFlow) {
+      if (!guestReady || !guestRoom) return;
+      startCall({
+        roomId: guestRoom, token: null, guestToken, guestName: guestNameInput,
+        selfName: guestNameInput, sessionId: null, isGuestFlow: true,
+      });
+      return;
     }
-  }
-
-  async function copyInvite() {
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-  }
-
-  if (left) {
-    return (
-      <div className="container" style={{ maxWidth: 480, paddingTop: "var(--space-16)", textAlign: "center" }}>
-        <h1 style={{ fontSize: "var(--text-heading)" }}>You left the call</h1>
-        <p>You can close this tab, or rejoin using the same link.</p>
-        <button className="btn btn-primary" onClick={() => setLeft(false)}>Rejoin</button>
-      </div>
-    );
-  }
+    if (!session) return;
+    if (activeCall?.sessionId === session.id) {
+      restore();
+      return;
+    }
+    startCall({
+      roomId: session.video_room_id,
+      token: localStorage.getItem("skillswap-access-token"),
+      guestToken: undefined,
+      guestName: undefined,
+      selfName: user?.name || "You",
+      sessionId: session.id,
+      isGuestFlow: false,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, isGuestFlow, guestReady, guestRoom, guestToken, guestNameInput]);
 
   // Guest flow: ask for a display name before ever opening the signaling
   // socket (the guest token only grants room access -- see
@@ -102,40 +109,8 @@ export default function SessionRoomPage() {
     }
   }
 
-  const roomId = isGuestFlow ? guestRoom : session.video_room_id;
-  const accessToken = isGuestFlow ? null : localStorage.getItem("skillswap-access-token");
-
-  return (
-    <div className="container" style={{ paddingTop: "var(--space-6)", paddingBottom: "var(--space-10)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: "var(--space-3)" }}>
-        <h1 style={{ fontSize: "var(--text-heading-sm)", margin: 0 }}>
-          {isGuestFlow ? "Video call" : "Session video call"}
-        </h1>
-        {!isGuestFlow && !inviteUrl && (
-          <button className="btn btn-secondary btn-sm" onClick={inviteGuest}>
-            Invite a guest
-          </button>
-        )}
-        {inviteUrl && (
-          <div className="card" style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", padding: "var(--space-2) var(--space-3)" }}>
-            <input readOnly value={inviteUrl} style={{ border: "none", width: 260, fontSize: "var(--text-body-sm)" }} />
-            <button className="btn btn-secondary btn-sm" onClick={copyInvite} aria-label="Copy invite link">
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {error && <div className="error-banner">{error}</div>}
-
-      <VideoRoom
-        roomId={roomId}
-        token={accessToken}
-        guestToken={isGuestFlow ? guestToken : undefined}
-        guestName={isGuestFlow ? guestNameInput : undefined}
-        selfName={isGuestFlow ? guestNameInput : user?.name || "You"}
-        onLeave={() => setLeft(true)}
-      />
-    </div>
-  );
+  // Nothing to render here once the handoff above has fired --
+  // PersistentCallOverlay is already showing the call full-size, since
+  // we're on this exact route.
+  return null;
 }

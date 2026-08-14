@@ -29,6 +29,9 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     badges: list[BadgeOut] = Field(default_factory=list)
+    # E2E encrypted chat (see models/user.py) -- public by definition, null
+    # until this user's browser has generated a keypair (see ChatPage.jsx).
+    public_key: str | None = None
 
     class Config:
         from_attributes = True
@@ -41,6 +44,12 @@ class UserUpdate(BaseModel):
     timezone: str | None = None
     # adults-only platform -- see ck_user_age_range
     age: int | None = Field(default=None, ge=18, le=130)
+    # E2E encrypted chat: base64-encoded raw ECDH (P-256) public key,
+    # uploaded once the browser generates/loads its keypair (see
+    # ChatPage.jsx and frontend/src/crypto/e2e.js). A raw P-256 public key
+    # is 65 bytes -> ~88 base64 chars; generous ceiling in case of a future
+    # curve/format change.
+    public_key: str | None = Field(default=None, max_length=500)
 
 
 class PublicSkillOut(BaseModel):

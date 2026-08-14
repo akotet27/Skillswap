@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api/credits", tags=["credits"])
 @router.get("/me", response_model=CreditSummaryOut)
 def my_credit_summary(user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
     txns = db.scalars(
-        select(CreditTransaction).where(CreditTransaction.user_id == user.id).order_by(CreditTransaction.created_at.desc())
+        select(CreditTransaction).where(CreditTransaction.user_id ==
+                                        user.id).order_by(CreditTransaction.created_at.desc())
     ).all()
     return CreditSummaryOut(balance=get_balance(db, user.id), pending_balance=get_pending_balance(db, user.id), transactions=txns)

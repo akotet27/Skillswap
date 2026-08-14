@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { BadgeCheck, ArrowUpRight, CalendarCheck, Handshake, Award, ChevronRight } from "lucide-react";
 import { apiJson, API_BASE } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationsContext";
 import { formatCredits } from "../utils/credits";
 
 /** The authenticated home feed ("/home") -- credits, upcoming sessions,
@@ -30,6 +32,7 @@ function fmtShort(iso) {
 
 export default function HomePage() {
   const { user: me } = useAuth();
+  const { pendingRequestsTotal } = useNotifications();
   const [credits, setCredits] = useState(null);
   const [sessions, setSessions] = useState(null);
   const [matches, setMatches] = useState(null);
@@ -133,22 +136,42 @@ export default function HomePage() {
           </section>
         </div>
 
-        {/* --- Right rail: credits, activity chart, quick stats --- */}
+        {/* --- Right rail: an "insight" card (credits) + a "tasks"-style
+            list of activity rows, instead of a plain label/number pair --
+            each row below is real SkillSwap data (sessions, requests,
+            badges), just carrying the insight-card/task-list visual
+            language: a status pill + corner action, a big headline
+            number with a trend mark, and tinted icon rows with counts. */}
         <aside className="home-rail">
-          <div className="card" style={{ padding: "var(--space-6)" }}>
-            <span className="eyebrow">Credits</span>
+          <p className="eyebrow" style={{ marginBottom: "var(--space-3)" }}>Insights</p>
+          <div className="card insight-card">
+            <div className="insight-card-top">
+              <span className="stat-card-tag">
+                <BadgeCheck size={12} /> Available
+              </span>
+              <Link to="/sessions" className="insight-card-arrow" aria-label="View credit history">
+                <ArrowUpRight size={16} />
+              </Link>
+            </div>
             {credits ? (
               <>
-                <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-heading-sm)", color: "var(--color-electric-blue)", fontWeight: 600 }}>
-                  {formatCredits(credits.balance)} available
-                </p>
-                <p className="field-hint" style={{ margin: "var(--space-1) 0 var(--space-4)" }}>
+                <h3 style={{ margin: "var(--space-4) 0 var(--space-1)" }}>Credits available</h3>
+                <p className="field-hint" style={{ margin: "0 0 var(--space-5)" }}>
                   {credits.pending_balance > 0
                     ? `${formatCredits(credits.pending_balance)} more pending escrow -- releases 24h after your session`
-                    : "None pending escrow right now"}
+                    : "Ready to spend on your next session"}
                 </p>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "var(--text-eyebrow)", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
+                    SKILLSWAP
+                  </span>
+                  <span className="insight-card-value">
+                    {credits.pending_balance > 0 && <span className="insight-card-trend up" aria-hidden="true" />}
+                    {formatCredits(credits.balance)}
+                  </span>
+                </div>
                 {chartData?.length > 0 && (
-                  <div style={{ height: 120, margin: "0 calc(var(--space-2) * -1)" }}>
+                  <div style={{ height: 110, margin: "var(--space-3) calc(var(--space-2) * -1) 0" }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                         <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} />
@@ -171,26 +194,40 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="card" style={{ padding: "var(--space-6)" }}>
-            <span className="eyebrow">Quick stats</span>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span className="field-hint" style={{ margin: 0 }}>Sessions completed</span>
-                <strong>{completedCount ?? "…"}</strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span className="field-hint" style={{ margin: 0 }}>Badges earned</span>
-                <strong>{badges.length}</strong>
-              </div>
+          <p className="eyebrow" style={{ margin: "var(--space-6) 0 var(--space-3)" }}>Activity</p>
+          <div className="stat-list">
+            <Link to="/sessions" className="stat-list-row" style={{ background: "var(--color-teach-bg)" }}>
+              <span className="stat-list-icon" style={{ background: "var(--surface)", color: "var(--color-leaf)" }}>
+                <CalendarCheck size={16} />
+              </span>
+              <span className="stat-list-label">Sessions completed</span>
+              <span className="stat-list-count">{completedCount ?? "…"}</span>
+              <ChevronRight size={16} className="stat-list-arrow" />
+            </Link>
+            <Link to="/requests" className="stat-list-row" style={{ background: "var(--color-learn-bg)" }}>
+              <span className="stat-list-icon" style={{ background: "var(--surface)", color: "var(--color-iris)" }}>
+                <Handshake size={16} />
+              </span>
+              <span className="stat-list-label">Pending requests</span>
+              <span className="stat-list-count">{pendingRequestsTotal}</span>
+              <ChevronRight size={16} className="stat-list-arrow" />
+            </Link>
+            <div className="stat-list-row" style={{ background: badges.length > 0 ? "rgba(47, 124, 246, 0.12)" : "var(--surface-alt)" }}>
+              <span className="stat-list-icon" style={{ background: "var(--surface)", color: "var(--color-electric-blue)" }}>
+                <Award size={16} />
+              </span>
+              <span className="stat-list-label">Badges earned</span>
+              <span className="stat-list-count">{badges.length}</span>
+              {badges.length > 0 && <ChevronRight size={16} className="stat-list-arrow" />}
             </div>
-            {badges.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", marginTop: "var(--space-4)" }}>
-                {badges.map((b) => (
-                  <span key={b.badge_key} className="tag tag-neutral" title={b.label}>{b.label}</span>
-                ))}
-              </div>
-            )}
           </div>
+          {badges.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", marginTop: "var(--space-4)" }}>
+              {badges.map((b) => (
+                <span key={b.badge_key} className="tag tag-neutral" title={b.label}>{b.label}</span>
+              ))}
+            </div>
+          )}
         </aside>
       </div>
     </div>

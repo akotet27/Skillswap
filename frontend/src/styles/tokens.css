@@ -92,6 +92,9 @@
   --space-20: 80px;
   --space-24: 96px;
 
+  /* Layout */
+  --content-max-width: 1320px; /* .container and .nav-bar-inner both cap to this, so page content and the nav bar's content always line up */
+
   /* Shape */
   --radius-card: 16px;
   --radius-pill: 999px;

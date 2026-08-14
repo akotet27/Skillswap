@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Video } from "lucide-react";
 import { apiJson } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import ReportUserModal from "../components/ReportUserModal";
+import SessionDetailsModal from "../components/SessionDetailsModal";
 import { formatCredits } from "../utils/credits";
 
 function fmt(iso) {
@@ -16,6 +19,7 @@ export default function SessionsPage() {
   const [busyId, setBusyId] = useState(null);
   const [reportTarget, setReportTarget] = useState(null); // { sessionId, otherName } | null
   const [reportedIds, setReportedIds] = useState(new Set());
+  const [selectedSession, setSelectedSession] = useState(null); // full session object | null
 
   async function load() {
     try {
@@ -87,8 +91,14 @@ export default function SessionsPage() {
           const canWrapUp = iAmLearner && started && (s.status === "scheduled" || s.status === "in_progress");
           const other = iAmLearner ? teacher : learner;
           const canReport = s.status === "completed" && !reportedIds.has(s.id) && other;
+          const joinable = s.status === "scheduled" || s.status === "in_progress";
           return (
-            <div key={s.id} className="card" style={{ padding: "var(--space-6)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
+            <div
+              key={s.id}
+              className="card"
+              onClick={() => setSelectedSession(s)}
+              style={{ padding: "var(--space-6)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)", cursor: "pointer" }}
+            >
               <div>
                 <p style={{ margin: 0 }}>
                   <strong>{teacher?.user.name}</strong> teaches <strong>{learner?.user.name}</strong>
@@ -96,7 +106,13 @@ export default function SessionsPage() {
                 </p>
                 <p className="field-hint" style={{ margin: "var(--space-2) 0 0" }}>{fmt(s.scheduled_start_utc)} — {s.status}</p>
               </div>
-              <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <div style={{ display: "flex", gap: "var(--space-2)" }} onClick={(e) => e.stopPropagation()}>
+                {joinable && (
+                  <Link to={`/session/${s.id}`} className="btn btn-primary btn-sm">
+                    <Video size={16} />
+                    Join
+                  </Link>
+                )}
                 {canWrapUp && (
                   <button className="btn btn-primary btn-sm" disabled={busyId === s.id} onClick={() => confirmComplete(s.id)} title="Confirms the session happened, so your teacher's credit starts its 24h hold">
                     Mark complete
@@ -134,6 +150,10 @@ export default function SessionsPage() {
             setReportTarget(null);
           }}
         />
+      )}
+
+      {selectedSession && (
+        <SessionDetailsModal session={selectedSession} onClose={() => setSelectedSession(null)} />
       )}
     </div>
   );

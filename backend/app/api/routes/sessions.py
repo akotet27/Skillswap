@@ -32,11 +32,13 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 # /api/users/{user_id}/skills -- see the comment there.)
 @router.get("/me", response_model=list[SessionOut])
 def list_my_sessions(user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
-    session_ids = db.scalars(select(SessionParticipant.session_id).where(SessionParticipant.user_id == user.id)).all()
+    session_ids = db.scalars(select(SessionParticipant.session_id).where(
+        SessionParticipant.user_id == user.id)).all()
     if not session_ids:
         return []
     return db.scalars(
-        select(Session).where(Session.id.in_(session_ids)).order_by(Session.scheduled_start_utc.desc())
+        select(Session).where(Session.id.in_(session_ids)).order_by(
+            Session.scheduled_start_utc.desc())
     ).all()
 
 
@@ -56,7 +58,8 @@ def cancel_session(session_id: int, user: User = Depends(get_current_user), db: 
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
 
-    other_participants = [p for p in session.participants if p.user_id != user.id]
+    other_participants = [
+        p for p in session.participants if p.user_id != user.id]
 
     try:
         booking.cancel_session(db, session, user)
@@ -74,7 +77,8 @@ def cancel_session(session_id: int, user: User = Depends(get_current_user), db: 
     for p in other_participants:
         other_user = db.get(User, p.user_id)
         if other_user:
-            send_cancellation_email.delay(other_user.email, user.name, when_iso)
+            send_cancellation_email.delay(
+                other_user.email, user.name, when_iso)
 
     return session
 
@@ -91,13 +95,17 @@ def complete_session(session_id: int, user: User = Depends(get_current_user), db
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
 
-    learner = next((p for p in session.participants if p.role == ParticipantRole.LEARNER), None)
+    learner = next((p for p in session.participants if p.role ==
+                   ParticipantRole.LEARNER), None)
     if learner is None or learner.user_id != user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the learner can confirm a session as complete")
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Only the learner can confirm a session as complete")
     if session.status not in (SessionStatus.SCHEDULED, SessionStatus.IN_PROGRESS):
-        raise HTTPException(status.HTTP_409_CONFLICT, f"Session is already {session.status.value}")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"Session is already {session.status.value}")
     if as_utc(session.scheduled_start_utc) > datetime.now(tz.utc):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Session hasn't started yet")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Session hasn't started yet")
 
     booking.complete_session(db, session_id)
     db.commit()
@@ -118,17 +126,22 @@ def report_session_participant(
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
     if session.status != SessionStatus.COMPLETED:
-        raise HTTPException(status.HTTP_409_CONFLICT, "You can only report a session after it's completed")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "You can only report a session after it's completed")
 
-    my_participation = next((p for p in session.participants if p.user_id == user.id), None)
+    my_participation = next(
+        (p for p in session.participants if p.user_id == user.id), None)
     if my_participation is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "You weren't part of this session")
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "You weren't part of this session")
 
     other = next(
-        (p for p in session.participants if p.user_id != user.id and p.role != ParticipantRole.GUEST), None
+        (p for p in session.participants if p.user_id !=
+         user.id and p.role != ParticipantRole.GUEST), None
     )
     if other is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "No one to report in this session")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "No one to report in this session")
 
     report = Report(
         session_id=session_id, reporter_id=user.id, reported_user_id=other.user_id,
@@ -152,7 +165,8 @@ def create_guest_invite(session_id: int, user: User = Depends(get_current_user),
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
     if user.id not in {p.user_id for p in session.participants}:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a session participant can invite guests")
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Only a session participant can invite guests")
 
     token = video_service.create_guest_token(session.video_room_id)
     # The room id travels in the URL unencrypted alongside the signed

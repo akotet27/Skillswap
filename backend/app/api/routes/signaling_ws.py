@@ -75,6 +75,14 @@ def _new_guest_id() -> int:
     return -random.randint(1, 2**31 - 1)
 
 
+def _notification_room(user_id: int) -> str:
+    # Same second-namespace pattern used everywhere else in this codebase
+    # (conversations.py, chat_ws.py, swap_requests.py) -- one shared
+    # ConnectionManager, a per-user room any authenticated page keeps
+    # open, not a second notification system.
+    return f"user:{user_id}"
+
+
 async def _post_system_message(db: DbSession, session: SessionModel, actor_user_id: int, text: str) -> None:
     """Inserts a real Message row (type=system) into the conversation
     between this session's teacher and learner, and pushes it live to
@@ -83,18 +91,42 @@ async def _post_system_message(db: DbSession, session: SessionModel, actor_user_
     see ChatPage.jsx), not a client-side-only toast that vanishes on
     refresh. Guests never trigger this (only called for real roles) and
     are silently skipped if a real teacher/learner pairing can't be
-    resolved (shouldn't happen in practice -- every session has both)."""
-    teacher = next((p for p in session.participants if p.role == ParticipantRole.TEACHER), None)
-    learner = next((p for p in session.participants if p.role == ParticipantRole.LEARNER), None)
+    resolved (shouldn't happen in practice -- every session has both).
+
+    Also pushes the same sidebar-badge/toast notification a normal chat
+    message would (see conversations.py/chat_ws.py's _notify_new_message)
+    -- these used to only update the open conversation's live transcript,
+    never the recipient's unread badge, so "X joined the call" could sit
+    unread with no visible sign of it anywhere outside the conversation
+    itself."""
+    teacher = next((p for p in session.participants if p.role ==
+                   ParticipantRole.TEACHER), None)
+    learner = next((p for p in session.participants if p.role ==
+                   ParticipantRole.LEARNER), None)
     if teacher is None or learner is None:
         return
-    conv = conv_service.get_or_create_conversation(db, teacher.user_id, learner.user_id)
-    message = Message(conversation_id=conv.id, sender_id=actor_user_id, type=MessageType.SYSTEM, content=text)
+    conv = conv_service.get_or_create_conversation(
+        db, teacher.user_id, learner.user_id)
+    message = Message(conversation_id=conv.id, sender_id=actor_user_id,
+                      type=MessageType.SYSTEM, content=text)
     db.add(message)
     db.commit()
     db.refresh(message)
     await manager.broadcast(
-        f"conv:{conv.id}", {"type": "chat", "message": MessageOut.model_validate(message).model_dump(mode="json")}
+        f"conv:{conv.id}", {"type": "chat", "message": MessageOut.model_validate(
+            message).model_dump(mode="json")}
+    )
+
+    recipient_id = learner.user_id if actor_user_id == teacher.user_id else teacher.user_id
+    await manager.broadcast(
+        _notification_room(recipient_id),
+        {
+            "type": "new-message-notification",
+            "conversation_id": conv.id,
+            "sender_name": "SkillSwap",
+            "preview": text,
+            "unread_total": conv_service.total_unread(db, recipient_id),
+        },
     )
 
 
@@ -170,15 +202,18 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
             return
 
         await manager.connect(room_id, peer_id, websocket)
-        existing_members = [{"id": pid, **{k: v for k, v in info.items() if k != "attendance_id"}} for pid, info in room.items()]
+        existing_members = [{"id": pid, **{k: v for k, v in info.items() if k != "attendance_id"}}
+                            for pid, info in room.items()]
         attendance_id = None
         # Guests never get a CallAttendance row -- duration-based partial
         # credit (services/credits.py) only ever pays the teacher, and a
         # guest's presence is irrelevant to that calculation.
         if role in _REAL_ROLES:
-            attendance_id = attendance_service.record_join(db, session.id, peer_id)
+            attendance_id = attendance_service.record_join(
+                db, session.id, peer_id)
             db.commit()
-        room[peer_id] = {"name": name, "role": role, "attendance_id": attendance_id}
+        room[peer_id] = {"name": name, "role": role,
+                         "attendance_id": attendance_id}
         joined = True
 
         # Phase 5, step 1 (the "session actually started" half): the first

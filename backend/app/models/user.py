@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, SmallInteger, CheckConstraint, ForeignKey, UniqueConstraint, func
+from sqlalchemy import String, DateTime, SmallInteger, CheckConstraint, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -51,6 +51,17 @@ class User(Base):
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
 
+    # End-to-end encrypted chat: this user's ECDH (P-256) public key, raw
+    # bytes, base64-encoded. Public by definition (that's the point of a
+    # public key) -- exposed on UserOut like any other profile field. The
+    # matching private key never leaves the browser it was generated on
+    # (see frontend/src/crypto/e2e.js) -- the server only ever stores and
+    # relays this. Null until the user's first visit to a chat after this
+    # feature shipped (or if they've never opened chat at all); messages
+    # stay unencrypted (see Message.iv) until both sides of a conversation
+    # have one.
+    public_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
 
@@ -92,14 +103,19 @@ class LoginAudit(Base):
 class UserBadge(Base):
     __tablename__ = "user_badges"
     __table_args__ = (
-        UniqueConstraint("user_id", "badge_key", name="uq_user_badges_once_per_badge"),
-        CheckConstraint("badge_key <> ''", name="ck_user_badges_badge_key_nonempty"),
+        UniqueConstraint("user_id", "badge_key",
+                         name="uq_user_badges_once_per_badge"),
+        CheckConstraint("badge_key <> ''",
+                        name="ck_user_badges_badge_key_nonempty"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    badge_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    earned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    user_id: Mapped[int] = mapped_column(ForeignKey(
+        "users.id", ondelete="CASCADE"), nullable=False, index=True)
+    badge_key: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True)
+    earned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="badges")
 

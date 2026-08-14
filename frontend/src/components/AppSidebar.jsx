@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, CalendarClock, MessageSquare, ShieldCheck, LogOut, Sun, Moon } from "lucide-react";
+import { Home, Compass, CalendarClock, Handshake, MessageSquare, ShieldCheck, LogOut, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useNotifications } from "../context/NotificationsContext";
@@ -17,6 +17,7 @@ import { formatCredits } from "../utils/credits";
 const NAV_ITEMS = [
   { label: "Home", to: "/home", icon: Home },
   { label: "Browse", to: "/browse", icon: Compass },
+  { label: "Requests", to: "/requests", icon: Handshake },
   { label: "Sessions", to: "/sessions", icon: CalendarClock },
   { label: "Messages", to: "/messages", icon: MessageSquare },
 ];
@@ -27,8 +28,9 @@ export default function AppSidebar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [credits, setCredits] = useState(null);
-  const { unreadTotal } = useNotifications();
+  const { unreadTotal, pendingRequestsTotal } = useNotifications();
   const navItems = user.is_admin ? [...NAV_ITEMS, { label: "Admin", to: "/admin", icon: ShieldCheck }] : NAV_ITEMS;
+  const badgeCounts = { Messages: unreadTotal, Requests: pendingRequestsTotal };
 
   useEffect(() => {
     apiJson("/api/credits/me").then((c) => setCredits(c.balance)).catch(() => {});
@@ -53,15 +55,18 @@ export default function AppSidebar() {
         </Link>
 
         <nav style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", flex: 1 }}>
-          {navItems.map(({ label, to, icon: Icon }) => (
-            <Link key={to} to={to} className={`app-sidebar-link${pathname === to ? " active" : ""}`} style={{ justifyContent: "space-between" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                <Icon size={18} />
-                {label}
-              </span>
-              {label === "Messages" && unreadTotal > 0 && <span className="unread-badge">{unreadTotal > 99 ? "99+" : unreadTotal}</span>}
-            </Link>
-          ))}
+          {navItems.map(({ label, to, icon: Icon }) => {
+            const count = badgeCounts[label] || 0;
+            return (
+              <Link key={to} to={to} className={`app-sidebar-link${pathname === to ? " active" : ""}`} style={{ justifyContent: "space-between" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                  <Icon size={18} />
+                  {label}
+                </span>
+                {count > 0 && <span className="unread-badge">{count > 99 ? "99+" : count}</span>}
+              </Link>
+            );
+          })}
         </nav>
 
         <button type="button" className="app-sidebar-link" onClick={toggle} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", font: "inherit" }}>
@@ -83,19 +88,22 @@ export default function AppSidebar() {
         </div>
       </aside>
 
-      {/* Narrow viewports: bottom tab bar, same four destinations */}
+      {/* Narrow viewports: bottom tab bar, same destinations */}
       <nav className="app-bottom-tabs" aria-label="Primary">
-        {NAV_ITEMS.map(({ label, to, icon: Icon }) => (
-          <Link key={to} to={to} className={`app-bottom-tab${pathname === to ? " active" : ""}`} aria-label={label} style={{ position: "relative" }}>
-            <Icon size={20} />
-            <span>{label}</span>
-            {label === "Messages" && unreadTotal > 0 && (
-              <span className="unread-badge" style={{ position: "absolute", top: 0, right: "22%" }}>
-                {unreadTotal > 99 ? "99+" : unreadTotal}
-              </span>
-            )}
-          </Link>
-        ))}
+        {NAV_ITEMS.map(({ label, to, icon: Icon }) => {
+          const count = badgeCounts[label] || 0;
+          return (
+            <Link key={to} to={to} className={`app-bottom-tab${pathname === to ? " active" : ""}`} aria-label={label} style={{ position: "relative" }}>
+              <Icon size={20} />
+              <span>{label}</span>
+              {count > 0 && (
+                <span className="unread-badge" style={{ position: "absolute", top: 0, right: "22%" }}>
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
+            </Link>
+          );
+        })}
         <Link to="/profile" className={`app-bottom-tab${pathname === "/profile" ? " active" : ""}`} aria-label="Profile">
           <img src={avatarUrl} alt="" width={20} height={20} style={{ borderRadius: "999px", objectFit: "cover" }} />
           <span>Profile</span>

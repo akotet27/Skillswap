@@ -107,8 +107,17 @@ async def conversation_socket(websocket: WebSocket, conversation_id: int):
                     content = (data.get("content") or "").strip()
                     if not content:
                         continue
+                    # `iv` set means the client already encrypted `content`
+                    # client-side (see frontend/src/crypto/e2e.js) -- the
+                    # server just stores and relays it verbatim, same as
+                    # plaintext, it just can't read it. Absent iv means
+                    # either party didn't have the other's public key yet
+                    # at send time (see ChatPage.jsx's fallback), so this
+                    # message is plain text like before the feature existed.
+                    iv = data.get("iv")
                     message = Message(
-                        conversation_id=conversation_id, sender_id=user.id, type=MessageType.TEXT, content=content
+                        conversation_id=conversation_id, sender_id=user.id, type=MessageType.TEXT,
+                        content=content, iv=iv,
                     )
                     db.add(message)
                     db.commit()
@@ -119,7 +128,11 @@ async def conversation_socket(websocket: WebSocket, conversation_id: int):
                     )
                     other_id = conv_service.other_participant_id(db, conversation_id, user.id)
                     if other_id is not None:
-                        await _notify_new_message(db, conversation_id, user, other_id, content[:120])
+                        # Can't preview ciphertext -- the server never has
+                        # the plaintext for an encrypted message, that's
+                        # the whole point of E2E.
+                        preview = "🔒 New encrypted message" if iv else content[:120]
+                        await _notify_new_message(db, conversation_id, user, other_id, preview)
 
                 elif msg_type == "typing":
                     # Ephemeral, never persisted -- just relayed so the

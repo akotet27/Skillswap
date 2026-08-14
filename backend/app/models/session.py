@@ -54,6 +54,19 @@ class Session(Base):
     credit_transactions: Mapped[list["CreditTransaction"]] = relationship(back_populates="session")  # noqa: F821
     ratings: Mapped[list["Rating"]] = relationship(back_populates="session", cascade="all, delete-orphan")  # noqa: F821
 
+    @property
+    def skill(self):
+        """The skill being taught in this session -- from the originating
+        SwapRequest's skill_learned_id (what the recipient/teacher agreed
+        to teach, see SwapRequest's own field comment). None only for a
+        session with no request_id at all, which the normal booking flow
+        never actually produces (request_id is nullable in the schema for
+        a hypothetical direct-booking path, not because it's ever
+        actually null today). Picked up automatically by SessionOut
+        (schemas/session.py) via from_attributes -- property name matches
+        the schema field name on purpose."""
+        return self.request.skill_learned if self.request else None
+
 
 class SessionParticipant(Base):
     __tablename__ = "session_participants"

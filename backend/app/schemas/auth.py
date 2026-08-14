@@ -11,7 +11,8 @@ _CLASS_PATTERNS = [r"[a-z]", r"[A-Z]", r"[0-9]", r"[^a-zA-Z0-9]"]
 
 
 def _validate_password_strength(value: str) -> str:
-    classes_met = sum(1 for pattern in _CLASS_PATTERNS if re.search(pattern, value))
+    classes_met = sum(
+        1 for pattern in _CLASS_PATTERNS if re.search(pattern, value))
     if classes_met < len(_CLASS_PATTERNS):
         raise ValueError(
             "Password must be at least 8 characters and include lowercase letters, "
@@ -26,7 +27,8 @@ class SignupRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     timezone: str = "UTC"
 
-    _check_password_strength = field_validator("password")(_validate_password_strength)
+    _check_password_strength = field_validator(
+        "password")(_validate_password_strength)
 
 
 class SignupResponse(BaseModel):
@@ -82,7 +84,8 @@ class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
 
-    _check_password_strength = field_validator("new_password")(_validate_password_strength)
+    _check_password_strength = field_validator(
+        "new_password")(_validate_password_strength)
 
 
 class TotpSetupResponse(BaseModel):
@@ -102,4 +105,5 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
 
-    _check_password_strength = field_validator("new_password")(_validate_password_strength)
+    _check_password_strength = field_validator(
+        "new_password")(_validate_password_strength)

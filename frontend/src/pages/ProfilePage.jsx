@@ -267,24 +267,36 @@ function TagList({ items, tagClass, onRemove, empty, waitlisted, onToggleWaitlis
 
 function AvailabilityCard() {
   const [blocks, setBlocks] = useState([]);
+  // The last-known-saved shape, so the Save button can appear only once
+  // `blocks` has actually drifted from it -- not persistently, the way it
+  // used to sit there whether or not there was anything to save.
+  const [savedBlocks, setSavedBlocks] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function load() {
-    setBlocks(await apiJson("/api/users/me/availability"));
+    const data = await apiJson("/api/users/me/availability");
+    setBlocks(data);
+    setSavedBlocks(data);
   }
   useEffect(() => {
     load();
   }, []);
 
+  const isDirty = JSON.stringify(blocks) !== JSON.stringify(savedBlocks);
+
   function addBlock() {
+    setMessage("");
     setBlocks([...blocks, { day_of_week: 0, start_time: "18:00", end_time: "19:00", timezone: tz }]);
   }
   function updateBlock(i, patch) {
+    setMessage("");
     setBlocks(blocks.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
   }
   function removeBlock(i) {
+    setMessage("");
     setBlocks(blocks.filter((_, idx) => idx !== i));
   }
 
@@ -299,6 +311,7 @@ function AvailabilityCard() {
 
   async function save() {
     setError("");
+    setMessage("");
     if (invalidBlocks.length > 0) {
       setError("End time must be after start time for every block -- fix the highlighted row(s) below.");
       return;
@@ -308,6 +321,8 @@ function AvailabilityCard() {
       const payload = blocks.map((b) => ({ ...b, day_of_week: Number(b.day_of_week) }));
       const saved = await apiJson("/api/users/me/availability", { method: "PUT", body: JSON.stringify(payload) });
       setBlocks(saved);
+      setSavedBlocks(saved);
+      setMessage("Saved.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -353,9 +368,12 @@ function AvailabilityCard() {
 
       <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-5)" }}>
         <button className="btn btn-secondary btn-sm" onClick={addBlock} type="button">+ Add block</button>
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} type="button">
-          {saving ? "Saving…" : "Save availability"}
-        </button>
+        {(isDirty || saving) && (
+          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} type="button">
+            {saving ? "Saving…" : "Save availability"}
+          </button>
+        )}
+        {!isDirty && message && <span style={{ display: "flex", alignItems: "center", color: "var(--color-leaf)" }}>{message}</span>}
       </div>
     </section>
   );

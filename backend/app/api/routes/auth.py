@@ -82,7 +82,8 @@ def signup(request: Request, payload: SignupRequest, db: DbSession = Depends(get
     code = pending_signup.create_pending_signup(
         payload.email, payload.password, payload.name, payload.timezone)
     send_otp_email.delay(payload.email, code, OtpPurpose.SIGNUP_VERIFY.value)
-    response = SignupResponse(message="Check your email for a verification code.", email=payload.email)
+    response = SignupResponse(
+        message="Check your email for a verification code.", email=payload.email)
     if settings.EMAIL_BACKEND != "smtp" and settings.ENVIRONMENT.lower() != "production":
         response.verification_code = code
     return response
@@ -134,7 +135,8 @@ def resend_signup_otp(request: Request, payload: ResendOtpRequest):
                              OtpPurpose.SIGNUP_VERIFY.value)
     # Always 202 -- same anti-enumeration reasoning as password reset:
     # don't reveal whether this email has a pending signup.
-    response = {"message": "If that email has a pending signup, a new code has been sent."}
+    response = {
+        "message": "If that email has a pending signup, a new code has been sent."}
     if code is not None and settings.EMAIL_BACKEND != "smtp" and settings.ENVIRONMENT.lower() != "production":
         response["verification_code"] = code
     return response
@@ -160,7 +162,8 @@ def login(request: Request, payload: LoginRequest, db: DbSession = Depends(get_d
     if not user.is_active:
         _log_login_attempt(db, request, payload.email, False, user.id)
         db.commit()
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been suspended.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "This account has been suspended.")
 
     if user.totp_enabled:
         _log_login_attempt(db, request, payload.email, True, user.id)

@@ -54,6 +54,10 @@ class SessionOut(BaseModel):
     is_group: bool
     max_participants: int
     participants: list[SessionParticipantOut]
+    # The skill being taught in this session -- see Session.skill in
+    # models/session.py. None only for a session with no originating
+    # SwapRequest, which the normal booking flow never actually produces.
+    skill: SkillOut | None = None
 
     class Config:
         from_attributes = True

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiJson } from "../api/client";
+import { useNotifications } from "../context/NotificationsContext";
 
 function fmt(iso) {
   return new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -10,6 +11,7 @@ export default function RequestsPage() {
   const [requests, setRequests] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const { refreshPendingRequestsTotal } = useNotifications();
 
   async function load() {
     try {
@@ -25,12 +27,22 @@ export default function RequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  // Visiting this page at all (even just switching tabs) is a reasonable
+  // moment to double-check the sidebar badge is accurate -- cheap, and
+  // catches it up if it ever drifted (e.g. acted on a request from a
+  // different tab/device).
+  useEffect(() => {
+    refreshPendingRequestsTotal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function act(id, action) {
     setError("");
     setBusyId(id);
     try {
       await apiJson(`/api/swap-requests/${id}/${action}`, { method: "POST" });
       await load();
+      refreshPendingRequestsTotal();
     } catch (e) {
       setError(e.message);
     } finally {

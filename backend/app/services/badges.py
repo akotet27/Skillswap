@@ -81,7 +81,8 @@ def award_badges_for_user(db: DbSession, user_id: int) -> list[str]:
         newly_awarded.append("5_star_streak")
 
     for badge_key in newly_awarded:
-        db.add(UserBadge(user_id=user_id, badge_key=badge_key, earned_at=datetime.now(timezone.utc)))
+        db.add(UserBadge(user_id=user_id, badge_key=badge_key,
+               earned_at=datetime.now(timezone.utc)))
 
     if newly_awarded:
         db.flush()

@@ -22,6 +22,15 @@ export default function VideoTile({ stream, name, muted = false, isLocal = false
         borderRadius: "var(--space-3)",
         overflow: "hidden",
         aspectRatio: "16 / 10",
+        // A tile's height is driven by its aspect-ratio off whatever
+        // width its grid column ends up with -- fine in a multi-column
+        // grid, but a *lone* tile (e.g. waiting for the other person to
+        // join) gets the full row width, and on a wide screen that
+        // computes a taller-than-viewport height, forcing the whole
+        // page to scroll just to see the controls. Capping it here
+        // means "cover" on the <video> below fills the box without
+        // stretching, instead of the box itself growing unbounded.
+        maxHeight: "min(58vh, 620px)",
         ...style,
       }}
     >
