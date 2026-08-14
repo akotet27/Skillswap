@@ -5,6 +5,15 @@ from pydantic import BaseModel, Field, model_validator
 from app.models.skill import SkillType
 
 
+class BadgeOut(BaseModel):
+    badge_key: str
+    label: str
+    earned_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class UserOut(BaseModel):
     id: int
     email: str
@@ -16,7 +25,10 @@ class UserOut(BaseModel):
     age: int | None
     is_email_verified: bool
     totp_enabled: bool
+    is_admin: bool
+    is_active: bool
     created_at: datetime
+    badges: list[BadgeOut] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -50,6 +62,7 @@ class PublicUserOut(BaseModel):
     rating_count: int
     availability_summary: str | None
     teach_skills: list[PublicSkillOut]
+    badges: list[BadgeOut] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -68,6 +81,10 @@ class UserSkillOut(BaseModel):
     id: int
     skill: SkillOut
     type: SkillType
+    # Only computed for 'want' rows (see list_my_skills) -- whether anyone
+    # currently teaches this skill. None for 'have' rows, where the
+    # question doesn't apply.
+    has_teacher: bool | None = None
 
     class Config:
         from_attributes = True

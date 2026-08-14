@@ -4,6 +4,7 @@ import { apiJson } from "../api/client";
 import PasswordStrengthHint from "../components/PasswordStrengthHint";
 import { checkPasswordStrength } from "../utils/passwordStrength";
 import MatchClusterIllustration from "../components/MatchClusterIllustration";
+import PasswordInput from "../components/PasswordInput";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -22,8 +23,8 @@ export default function SignupPage() {
     }
     setSubmitting(true);
     try {
-      await apiJson("/api/auth/signup", { method: "POST", body: JSON.stringify(form) });
-      navigate("/verify-otp", { state: { email: form.email } });
+      const res = await apiJson("/api/auth/signup", { method: "POST", body: JSON.stringify(form) });
+      navigate("/verify-otp", { state: { email: form.email, verificationCode: res.verification_code || "" } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,9 +52,8 @@ export default function SignupPage() {
           </div>
           <div className="field">
             <label htmlFor="password">Password</label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               required
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}

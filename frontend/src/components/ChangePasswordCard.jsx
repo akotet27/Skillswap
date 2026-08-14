@@ -2,6 +2,7 @@ import { useState } from "react";
 import { apiJson } from "../api/client";
 import { checkPasswordStrength } from "../utils/passwordStrength";
 import PasswordStrengthHint from "./PasswordStrengthHint";
+import PasswordInput from "./PasswordInput";
 
 /** Lives in Settings alongside 2FA -- account security, not identity.
  * Google-only accounts (no local password) aren't distinguishable from
@@ -61,16 +62,16 @@ export default function ChangePasswordCard() {
       <form onSubmit={onSubmit}>
         <div className="field">
           <label htmlFor="current-pw">Current password</label>
-          <input id="current-pw" type="password" required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <PasswordInput id="current-pw" required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="new-pw">New password</label>
-          <input id="new-pw" type="password" required autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+          <PasswordInput id="new-pw" required autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
           <PasswordStrengthHint password={next} />
         </div>
         <div className="field">
           <label htmlFor="confirm-pw">Confirm new password</label>
-          <input id="confirm-pw" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <PasswordInput id="confirm-pw" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           {mismatch && <span className="field-error">Passwords don't match.</span>}
         </div>
         <button className="btn btn-primary" disabled={submitting || !strength.isStrong || mismatch || !confirm}>

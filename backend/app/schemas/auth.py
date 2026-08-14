@@ -32,6 +32,7 @@ class SignupRequest(BaseModel):
 class SignupResponse(BaseModel):
     message: str
     email: EmailStr
+    verification_code: str | None = None
 
 
 class VerifyOtpRequest(BaseModel):

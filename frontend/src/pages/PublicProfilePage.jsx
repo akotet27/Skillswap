@@ -28,6 +28,8 @@ export default function PublicProfilePage() {
         return <div className="container" style={{ paddingTop: "var(--space-16)" }}>Loading…</div>;
     }
 
+    const badges = profile.badges || [];
+
     return (
         <div className="container" style={{ maxWidth: 760, paddingTop: "var(--space-10)", paddingBottom: "var(--space-20)" }}>
             <div className="card" style={{ padding: "var(--space-8)", display: "grid", gap: "var(--space-6)" }}>
@@ -48,6 +50,15 @@ export default function PublicProfilePage() {
                                 : "No ratings yet"}
                         </p>
                         {profile.availability_summary && <p style={{ marginTop: "var(--space-2)" }}>{profile.availability_summary}</p>}
+                        {badges.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+                                {badges.map((badge) => (
+                                    <span key={badge.badge_key} className="tag tag-neutral" title={badge.label}>
+                                        {badge.label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <button
                         className="btn btn-primary"

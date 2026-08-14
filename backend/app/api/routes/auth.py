@@ -8,7 +8,9 @@ import logging
 from datetime import datetime, timedelta, timezone as tz
 
 import pyotp
+from authlib.integrations.base_client.errors import MismatchingStateError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
@@ -80,7 +82,10 @@ def signup(request: Request, payload: SignupRequest, db: DbSession = Depends(get
     code = pending_signup.create_pending_signup(
         payload.email, payload.password, payload.name, payload.timezone)
     send_otp_email.delay(payload.email, code, OtpPurpose.SIGNUP_VERIFY.value)
-    return SignupResponse(message="Check your email for a verification code.", email=payload.email)
+    response = SignupResponse(message="Check your email for a verification code.", email=payload.email)
+    if settings.EMAIL_BACKEND != "smtp" and settings.ENVIRONMENT.lower() != "production":
+        response.verification_code = code
+    return response
 
 
 @router.post("/verify-otp", response_model=TokenPair)
@@ -129,7 +134,10 @@ def resend_signup_otp(request: Request, payload: ResendOtpRequest):
                              OtpPurpose.SIGNUP_VERIFY.value)
     # Always 202 -- same anti-enumeration reasoning as password reset:
     # don't reveal whether this email has a pending signup.
-    return {"message": "If that email has a pending signup, a new code has been sent."}
+    response = {"message": "If that email has a pending signup, a new code has been sent."}
+    if code is not None and settings.EMAIL_BACKEND != "smtp" and settings.ENVIRONMENT.lower() != "production":
+        response["verification_code"] = code
+    return response
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -148,6 +156,11 @@ def login(request: Request, payload: LoginRequest, db: DbSession = Depends(get_d
         db.commit()
         raise HTTPException(status.HTTP_403_FORBIDDEN,
                             "Email not verified yet")
+
+    if not user.is_active:
+        _log_login_attempt(db, request, payload.email, False, user.id)
+        db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been suspended.")
 
     if user.totp_enabled:
         _log_login_attempt(db, request, payload.email, True, user.id)
@@ -209,7 +222,17 @@ async def google_login(request: Request):
 
 @router.get("/google/callback")
 async def google_callback(request: Request, db: DbSession = Depends(get_db)):
-    token = await oauth.google.authorize_access_token(request)
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except MismatchingStateError:
+        # If the browser lost the OAuth session cookie or the user restarted
+        # the flow in another tab, Google can return a valid code but the
+        # original state no longer matches. Treat that as a recoverable
+        # login interruption instead of a 500.
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_ORIGIN}/login?oauth_error=google_state_mismatch",
+            status_code=status.HTTP_302_FOUND,
+        )
     userinfo = token.get("userinfo") or await oauth.google.userinfo(token=token)
 
     google_id = userinfo["sub"]
@@ -237,16 +260,20 @@ async def google_callback(request: Request, db: DbSession = Depends(get_db)):
             db.flush()
             credits.grant_signup_bonus(db, user.id)
 
+    if not user.is_active:
+        db.commit()
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_ORIGIN}/login?oauth_error=account_suspended",
+            status_code=status.HTTP_302_FOUND,
+        )
+
     access, refresh = auth_service.issue_token_pair(db, user)
     db.commit()
 
     # Redirect back to the SPA with tokens in the fragment (never a query
     # string, which would land in server logs / browser history).
-    return {
-        "access_token": access,
-        "refresh_token": refresh,
-        "redirect": f"{settings.FRONTEND_ORIGIN}/oauth/callback#access_token={access}&refresh_token={refresh}",
-    }
+    redirect_url = f"{settings.FRONTEND_ORIGIN}/oauth/callback#access_token={access}&refresh_token={refresh}"
+    return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)

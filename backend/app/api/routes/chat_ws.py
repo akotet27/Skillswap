@@ -33,6 +33,25 @@ def _room(conversation_id: int) -> str:
     return f"conv:{conversation_id}"
 
 
+def _notification_room(user_id: int) -> str:
+    # Same second-namespace pattern as conversations.py's REST voice-note
+    # path -- one ConnectionManager, two kinds of room, not two systems.
+    return f"user:{user_id}"
+
+
+async def _notify_new_message(db: DbSession, conversation_id: int, sender: User, recipient_id: int, preview: str) -> None:
+    await manager.broadcast(
+        _notification_room(recipient_id),
+        {
+            "type": "new-message-notification",
+            "conversation_id": conversation_id,
+            "sender_name": sender.name,
+            "preview": preview,
+            "unread_total": conv_service.total_unread(db, recipient_id),
+        },
+    )
+
+
 async def _authenticate(websocket: WebSocket, db: DbSession) -> User | None:
     token = websocket.query_params.get("token")
     if not token:
@@ -98,6 +117,9 @@ async def conversation_socket(websocket: WebSocket, conversation_id: int):
                         _room(conversation_id),
                         {"type": "chat", "message": MessageOut.model_validate(message).model_dump(mode="json")},
                     )
+                    other_id = conv_service.other_participant_id(db, conversation_id, user.id)
+                    if other_id is not None:
+                        await _notify_new_message(db, conversation_id, user, other_id, content[:120])
 
                 elif msg_type == "typing":
                     # Ephemeral, never persisted -- just relayed so the
@@ -117,5 +139,39 @@ async def conversation_socket(websocket: WebSocket, conversation_id: int):
             await manager.broadcast(
                 _room(conversation_id), {"type": "presence", "user_id": user.id, "status": "offline"}
             )
+    finally:
+        db.close()
+
+
+@router.websocket("/ws/notifications")
+async def notifications_socket(websocket: WebSocket):
+    """One persistent, per-user channel -- every authenticated page opens
+    this on mount (see AppSidebar.jsx's useNotifications hook), joining
+    room `user:{id}` in the same shared ConnectionManager the
+    conversation and video-signaling rooms already use. Purely server-push
+    (new-message-notification); the client never sends anything here
+    beyond keeping the socket open. This is what lets a message reach
+    someone wherever they are in the app, not just when they happen to
+    have the specific conversation open."""
+    db = SessionLocal()
+    try:
+        user = await _authenticate(websocket, db)
+        if user is None:
+            await websocket.close(code=4401)
+            return
+
+        room = _notification_room(user.id)
+        await manager.connect(room, user.id, websocket)
+        try:
+            while True:
+                # No inbound message types yet -- just keeps the connection
+                # (and thus room membership) alive until the client
+                # disconnects. receive_json() blocks until then or raises
+                # WebSocketDisconnect.
+                await websocket.receive_json()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            manager.disconnect(room, user.id)
     finally:
         db.close()

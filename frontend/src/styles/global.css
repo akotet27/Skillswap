@@ -143,6 +143,193 @@ select:focus-visible,
   :root { --drawer-width: 84vw; }
 }
 
+/* --- Persistent authenticated nav shell (AppSidebar.jsx) ---
+   Unlike .app-drawer above (guest-only, toggle-open hamburger), this is
+   always visible on every logged-in page -- no open/closed state, no
+   transform. >=860px: a real sticky/fixed sidebar with permanent
+   margin-left on .app-shell.authed. <860px: a bottom tab bar instead
+   (same four destinations, icons only) -- both markups always render,
+   CSS alone decides which is visible, so there's no JS breakpoint to
+   get out of sync with the stylesheet. */
+:root {
+  --sidebar-width: 240px;
+}
+.app-sidebar { display: none; }
+@media (min-width: 860px) {
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    padding: var(--space-6) var(--space-4);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    z-index: 50;
+    gap: var(--space-1);
+  }
+}
+.app-sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-heading);
+  font-weight: 700;
+  font-size: var(--text-body-lg);
+  text-decoration: none;
+  margin-bottom: var(--space-8);
+  padding: 0 var(--space-3);
+}
+.app-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--space-3);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: var(--text-body-sm);
+  cursor: pointer;
+}
+.app-sidebar-link:hover { background: var(--surface-alt); color: var(--text-heading); }
+.app-sidebar-link.active { background: var(--surface-alt); color: var(--text-heading); }
+.app-sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+.app-sidebar-profile-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+}
+.app-sidebar-profile-link:hover { background: var(--surface-alt); }
+.app-sidebar-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--space-3);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.app-sidebar-logout:hover { background: var(--surface-alt); color: var(--color-coral); }
+
+.app-bottom-tabs {
+  display: flex;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+  padding: var(--space-2) 0;
+}
+@media (min-width: 860px) {
+  .app-bottom-tabs { display: none; }
+}
+.app-bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: var(--space-1) 0;
+}
+.app-bottom-tab.active { color: var(--color-electric-blue); }
+
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-coral);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Incoming-message toast (MessageToast.jsx) -- fixed small card on
+   desktop; full-width-minus-margin on narrow screens rather than a
+   fixed small width that would look lost (or clipped) on a phone. */
+.message-toast {
+  position: fixed;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  left: var(--space-6);
+  z-index: 200;
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hover);
+  padding: var(--space-4) var(--space-5);
+  max-width: 340px;
+}
+@media (min-width: 640px) {
+  .message-toast { left: auto; }
+}
+/* Above the mobile bottom tab bar, not underneath it. */
+@media (max-width: 859px) {
+  .message-toast { bottom: calc(64px + var(--space-4)); }
+}
+
+/* Authenticated page content: bottom padding so it doesn't sit under
+   the fixed tab bar on mobile; permanent left margin to make room for
+   the sidebar on desktop (no toggle -- this shell is always present). */
+.app-shell.authed { padding-bottom: 72px; }
+@media (min-width: 860px) {
+  .app-shell.authed { margin-left: var(--sidebar-width); padding-bottom: 0; }
+}
+
+/* Home page: main content + a right-hand rail (credits/stats), instead
+   of one narrow centered column with large empty gutters on wide
+   viewports. Single column below 860px, rail moved *above* the main
+   content via `order` (not disappearing). */
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+.home-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  order: -1;
+}
+@media (min-width: 860px) {
+  .home-grid { grid-template-columns: 1fr 300px; align-items: start; }
+  .home-rail { order: 0; position: sticky; top: var(--space-8); }
+}
+
 .nav-dropdown-item {
   display: flex;
   align-items: center;
@@ -379,7 +566,11 @@ select:focus-visible,
 .auth-illustration {
   order: -1;
   flex: 1;
-  max-width: 420px;
+  /* Scales with the available panel width instead of sitting at a small
+     fixed size with empty margin around it -- still capped so it doesn't
+     dwarf the form on very wide viewports. */
+  max-width: 560px;
+  width: 100%;
   display: none;
 }
 @media (min-width: 960px) {

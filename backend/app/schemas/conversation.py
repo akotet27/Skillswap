@@ -27,6 +27,7 @@ class ConversationOut(BaseModel):
     id: int
     other_user: UserOut
     last_message: MessageOut | None
+    unread_count: int = 0
     created_at: datetime
 
 

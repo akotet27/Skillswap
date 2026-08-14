@@ -15,6 +15,7 @@ Client -> server:
   {"type": "chat", "content": "..."}                     -- in-call text chat
   {"type": "reaction", "emoji": "..."}                   -- floating emoji overlay
   {"type": "publish-state", "state": "requesting"|"publishing"}
+    {"type": "screen-share-state", "sharing": true|false}
 
 Server -> client:
   {"type": "room-state", "state": "connected", "self_id": <id>,
@@ -49,9 +50,12 @@ from sqlalchemy.orm import Session as DbSession
 from app.core.security import decode_access_token
 from app.core.timeutils import as_utc
 from app.db.session import SessionLocal
+from app.models.messaging import Message, MessageType
 from app.models.session import Session as SessionModel, SessionParticipant, ParticipantRole, SessionStatus
 from app.models.user import User
-from app.services import booking, video as video_service
+from app.schemas.conversation import MessageOut
+from app.services import attendance as attendance_service, booking, conversations as conv_service, video as video_service
+from app.tasks.badge_tasks import award_session_badges
 from app.ws.connection_manager import manager
 
 _REAL_ROLES = (ParticipantRole.TEACHER.value, ParticipantRole.LEARNER.value)
@@ -69,6 +73,29 @@ _peer_info: dict[str, dict[int, dict]] = {}
 def _new_guest_id() -> int:
     # Negative range never collides with a real (positive, autoincrement) user id.
     return -random.randint(1, 2**31 - 1)
+
+
+async def _post_system_message(db: DbSession, session: SessionModel, actor_user_id: int, text: str) -> None:
+    """Inserts a real Message row (type=system) into the conversation
+    between this session's teacher and learner, and pushes it live to
+    anyone with that conversation open -- "X joined/left the call" reads
+    as an ordinary line in the transcript (Slack-style centered/muted,
+    see ChatPage.jsx), not a client-side-only toast that vanishes on
+    refresh. Guests never trigger this (only called for real roles) and
+    are silently skipped if a real teacher/learner pairing can't be
+    resolved (shouldn't happen in practice -- every session has both)."""
+    teacher = next((p for p in session.participants if p.role == ParticipantRole.TEACHER), None)
+    learner = next((p for p in session.participants if p.role == ParticipantRole.LEARNER), None)
+    if teacher is None or learner is None:
+        return
+    conv = conv_service.get_or_create_conversation(db, teacher.user_id, learner.user_id)
+    message = Message(conversation_id=conv.id, sender_id=actor_user_id, type=MessageType.SYSTEM, content=text)
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    await manager.broadcast(
+        f"conv:{conv.id}", {"type": "chat", "message": MessageOut.model_validate(message).model_dump(mode="json")}
+    )
 
 
 async def _resolve_identity(websocket: WebSocket, db: DbSession, room_id: str) -> tuple[int, str, str] | None:
@@ -117,17 +144,20 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
     # guards the `finally` cleanup below from treating a *rejected* connection
     # (room full, unauthorized) as a departure of someone who was never announced.
     try:
-        session = db.scalar(select(SessionModel).where(SessionModel.video_room_id == room_id))
+        session = db.scalar(select(SessionModel).where(
+            SessionModel.video_room_id == room_id))
         if session is None:
             await websocket.close(code=4404)  # room doesn't exist
             return
         if session.status not in (SessionStatus.SCHEDULED, SessionStatus.IN_PROGRESS):
-            await websocket.close(code=4410)  # gone -- session already completed/cancelled/no-show
+            # gone -- session already completed/cancelled/no-show
+            await websocket.close(code=4410)
             return
 
         identity = await _resolve_identity(websocket, db, room_id)
         if identity is None:
-            await websocket.close(code=4401)  # unauthenticated / not a participant
+            # unauthenticated / not a participant
+            await websocket.close(code=4401)
             return
         peer_id, name, role = identity
 
@@ -140,8 +170,15 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
             return
 
         await manager.connect(room_id, peer_id, websocket)
-        existing_members = [{"id": pid, **info} for pid, info in room.items()]
-        room[peer_id] = {"name": name, "role": role}
+        existing_members = [{"id": pid, **{k: v for k, v in info.items() if k != "attendance_id"}} for pid, info in room.items()]
+        attendance_id = None
+        # Guests never get a CallAttendance row -- duration-based partial
+        # credit (services/credits.py) only ever pays the teacher, and a
+        # guest's presence is irrelevant to that calculation.
+        if role in _REAL_ROLES:
+            attendance_id = attendance_service.record_join(db, session.id, peer_id)
+            db.commit()
+        room[peer_id] = {"name": name, "role": role, "attendance_id": attendance_id}
         joined = True
 
         # Phase 5, step 1 (the "session actually started" half): the first
@@ -151,9 +188,11 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
         if role in _REAL_ROLES:
             booking.mark_in_progress(db, session.id)
             db.commit()
+            await _post_system_message(db, session, peer_id, f"{name} joined the call")
 
         await manager.send_to(
-            room_id, peer_id, {"type": "room-state", "state": "connected", "self_id": peer_id, "members": existing_members}
+            room_id, peer_id, {"type": "room-state", "state": "connected",
+                               "self_id": peer_id, "members": existing_members}
         )
         await manager.broadcast(room_id, {"type": "peer-joined", "id": peer_id, "name": name, "role": role}, exclude_user_id=peer_id)
 
@@ -199,6 +238,15 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
                         continue
                     await manager.broadcast(room_id, {"type": "publish-state", "from": peer_id, "state": state}, exclude_user_id=peer_id)
 
+                elif msg_type == "screen-share-state":
+                    sharing = bool(data.get("sharing"))
+                    await manager.broadcast(
+                        room_id,
+                        {"type": "screen-share-state",
+                            "from": peer_id, "sharing": sharing},
+                        exclude_user_id=peer_id,
+                    )
+
                 # Unrecognized types are ignored, not errors -- forward-compatible
                 # with new message kinds without a breaking change.
 
@@ -209,12 +257,20 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
         if joined:
             manager.disconnect(room_id, peer_id)
             room = _peer_info.get(room_id)
+            left_info = None
             if room is not None:
-                room.pop(peer_id, None)
+                left_info = room.pop(peer_id, None)
                 if not room:
                     del _peer_info[room_id]
                 else:
                     await manager.broadcast(room_id, {"type": "peer-left", "id": peer_id})
+
+            if role in _REAL_ROLES:
+                attendance_id = (left_info or {}).get("attendance_id")
+                if attendance_id is not None:
+                    attendance_service.record_leave(db, attendance_id)
+                    db.commit()
+                await _post_system_message(db, session, peer_id, f"{name} left the call.")
 
             # Phase 5, step 1's automatic path: "both participants' sockets
             # disconnect from the video room after the scheduled end time."
@@ -225,9 +281,11 @@ async def video_room_socket(websocket: WebSocket, room_id: str):
             # complete_session()'s atomic guard makes this safe to call
             # redundantly (e.g. both peers leaving within the same second).
             remaining_roles = {info["role"] for info in (room or {}).values()}
-            no_real_participants_left = not (remaining_roles & set(_REAL_ROLES))
+            no_real_participants_left = not (
+                remaining_roles & set(_REAL_ROLES))
             if no_real_participants_left and as_utc(session.scheduled_end_utc) <= datetime.now(tz.utc):
                 if booking.complete_session(db, session.id):
                     db.commit()
-                    logger.info("Session %s auto-completed (all participants left after scheduled end)", session.id)
+                    logger.info(
+                        "Session %s auto-completed (all participants left after scheduled end)", session.id)
         db.close()

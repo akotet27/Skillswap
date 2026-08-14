@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { apiJson } from "../api/client";
 import PasswordStrengthHint from "../components/PasswordStrengthHint";
+import PasswordInput from "../components/PasswordInput";
 import { checkPasswordStrength } from "../utils/passwordStrength";
 
 export default function ResetPasswordPage() {
@@ -73,9 +74,8 @@ export default function ResetPasswordPage() {
         <form onSubmit={onSubmit} className="card" style={{ padding: "var(--space-8)" }}>
           <div className="field">
             <label htmlFor="password">New password</label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               required
               autoComplete="new-password"
               value={password}
@@ -85,9 +85,8 @@ export default function ResetPasswordPage() {
           </div>
           <div className="field">
             <label htmlFor="confirm">Confirm new password</label>
-            <input
+            <PasswordInput
               id="confirm"
-              type="password"
               required
               autoComplete="new-password"
               value={confirm}

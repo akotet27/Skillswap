@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, SmallInteger, CheckConstraint, func
+from sqlalchemy import String, DateTime, SmallInteger, CheckConstraint, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.services.badge_catalog import BADGE_DEFINITIONS
 
 
 class User(Base):
@@ -39,6 +40,10 @@ class User(Base):
     is_email_verified: Mapped[bool] = mapped_column(
         default=False, nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
+    # Suspend/ban, not delete -- flips to False to block login (see
+    # /api/auth/login) while keeping the account's history (sessions,
+    # ratings, reports) intact for moderation review. Reversible.
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # TOTP 2FA (Phase 1). Secret is only meaningful once totp_enabled=True;
     # it's generated and shown to the user (as a QR code) before they
@@ -58,6 +63,8 @@ class User(Base):
     otp_codes: Mapped[list["OtpCode"]] = relationship(
         back_populates="user", cascade="all, delete-orphan")
     credit_transactions: Mapped[list["CreditTransaction"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan")
+    badges: Mapped[list["UserBadge"]] = relationship(
         back_populates="user", cascade="all, delete-orphan")
 
 
@@ -80,3 +87,22 @@ class LoginAudit(Base):
         String(512), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
+
+
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+    __table_args__ = (
+        UniqueConstraint("user_id", "badge_key", name="uq_user_badges_once_per_badge"),
+        CheckConstraint("badge_key <> ''", name="ck_user_badges_badge_key_nonempty"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    badge_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    earned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="badges")
+
+    @property
+    def label(self) -> str:
+        return BADGE_DEFINITIONS.get(self.badge_key, self.badge_key)

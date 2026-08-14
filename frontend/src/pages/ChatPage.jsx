@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Mic, Square, Send, Video } from "lucide-react";
 import { apiFetch, apiJson, API_BASE } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationsContext";
 import PresenceDot from "../components/PresenceDot";
 
 const WS_BASE = import.meta.env.VITE_WS_BASE_URL || "ws://localhost:8000";
@@ -16,6 +17,7 @@ function fmtTime(iso) {
 export default function ChatPage() {
   const { conversationId } = useParams();
   const { user: me } = useAuth();
+  const { setActiveConversation, refreshUnreadTotal } = useNotifications();
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
@@ -57,6 +59,20 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
+  }, [conversationId]);
+
+  // Opening a conversation marks it read (so the sidebar badge/unread
+  // dots drop immediately, not just after a full page reload) and
+  // registers it as "currently open" so NotificationsProvider knows not
+  // to also pop a toast for messages that land in it while it's open --
+  // they're already visible in the live transcript via the WS below.
+  useEffect(() => {
+    setActiveConversation(Number(conversationId));
+    apiJson(`/api/conversations/${conversationId}/read`, { method: "POST" })
+      .catch(() => {})
+      .finally(refreshUnreadTotal);
+    return () => setActiveConversation(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   // Open the WebSocket once we have a confirmed-fresh token.
@@ -191,6 +207,17 @@ export default function ChatPage() {
 
       <div ref={scrollRef} className="card" style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {messages.map((m) => {
+          if (m.type === "system") {
+            // Centered, muted pill -- never a left/right-aligned bubble
+            // like a normal sender message, same convention as Slack's
+            // "X joined the channel" rows (see signaling_ws.py's
+            // _post_system_message, the source of these).
+            return (
+              <div key={m.id} style={{ alignSelf: "center" }}>
+                <span className="tag tag-neutral" style={{ fontWeight: 500 }}>{m.content}</span>
+              </div>
+            );
+          }
           const mine = m.sender_id === me.id;
           return (
             <div key={m.id} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "75%" }}>

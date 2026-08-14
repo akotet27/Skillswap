@@ -7,7 +7,10 @@ from app.models.credit import CreditType, CreditStatus
 
 class CreditTransactionOut(BaseModel):
     id: int
-    amount: int
+    # float, not int: 'earned' rows can be fractional now (duration-based
+    # partial credit -- see services/credits.py:compute_earned_amount).
+    # Every other type still only ever holds exactly 1 or -1.
+    amount: float
     type: CreditType
     status: CreditStatus
     session_id: int | None
@@ -19,5 +22,6 @@ class CreditTransactionOut(BaseModel):
 
 
 class CreditSummaryOut(BaseModel):
-    balance: int
+    balance: float
+    pending_balance: float
     transactions: list[CreditTransactionOut]

@@ -23,4 +23,5 @@ from app.models import (  # noqa: E402,F401
     credit,
     rating,
     auth as auth_model,
+    report,
 )

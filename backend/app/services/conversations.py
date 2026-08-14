@@ -7,7 +7,7 @@ chat later without a migration -- get_or_create is what enforces the
 """
 from datetime import datetime, timezone as tz
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.models.messaging import Conversation, ConversationParticipant, Message
@@ -100,3 +100,48 @@ def last_message(db: DbSession, conversation_id: int) -> Message | None:
     return db.scalar(
         select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at.desc()).limit(1)
     )
+
+
+def _unread_where(conversation_id: int, user_id: int, last_read_at: datetime | None):
+    """A message counts as unread for `user_id` if it's not their own
+    (you're never "unread" on your own messages) and it landed after
+    their last_read_at -- or they have no last_read_at at all, meaning
+    they've never opened this conversation."""
+    clauses = [Message.conversation_id == conversation_id, Message.sender_id != user_id]
+    if last_read_at is not None:
+        clauses.append(Message.created_at > last_read_at)
+    return clauses
+
+
+def unread_count(db: DbSession, conversation_id: int, user_id: int) -> int:
+    participant = db.scalar(
+        select(ConversationParticipant).where(
+            ConversationParticipant.conversation_id == conversation_id, ConversationParticipant.user_id == user_id
+        )
+    )
+    last_read_at = participant.last_read_at if participant else None
+    return db.scalar(select(func.count(Message.id)).where(*_unread_where(conversation_id, user_id, last_read_at))) or 0
+
+
+def total_unread(db: DbSession, user_id: int) -> int:
+    """Summed across every conversation the user's in -- backs the
+    sidebar's Messages badge, which shows one number regardless of which
+    conversation(s) it's spread across."""
+    participants = db.scalars(select(ConversationParticipant).where(ConversationParticipant.user_id == user_id)).all()
+    total = 0
+    for p in participants:
+        total += db.scalar(
+            select(func.count(Message.id)).where(*_unread_where(p.conversation_id, user_id, p.last_read_at))
+        ) or 0
+    return total
+
+
+def mark_read(db: DbSession, conversation_id: int, user_id: int) -> None:
+    participant = db.scalar(
+        select(ConversationParticipant).where(
+            ConversationParticipant.conversation_id == conversation_id, ConversationParticipant.user_id == user_id
+        )
+    )
+    if participant is not None:
+        participant.last_read_at = datetime.now(tz.utc)
+        db.commit()

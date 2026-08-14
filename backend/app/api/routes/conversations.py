@@ -31,6 +31,29 @@ def _conversation_room(conversation_id: int) -> str:
     return f"conv:{conversation_id}"
 
 
+def _notification_room(user_id: int) -> str:
+    # A second namespace in the same shared ConnectionManager (not a
+    # second notification system) -- every authenticated page keeps one
+    # of these open (see AppSidebar.jsx -> useNotifications), so a
+    # message can reach someone regardless of which page they're on,
+    # unlike _conversation_room which only reaches people with that
+    # specific conversation open.
+    return f"user:{user_id}"
+
+
+async def _notify_new_message(db: DbSession, conversation_id: int, sender: User, recipient_id: int, preview: str) -> None:
+    await manager.broadcast(
+        _notification_room(recipient_id),
+        {
+            "type": "new-message-notification",
+            "conversation_id": conversation_id,
+            "sender_name": sender.name,
+            "preview": preview,
+            "unread_total": conv_service.total_unread(db, recipient_id),
+        },
+    )
+
+
 @router.post("", response_model=ConversationOut, status_code=status.HTTP_201_CREATED)
 def create_or_get_conversation(
     payload: ConversationCreate, user: User = Depends(get_current_user), db: DbSession = Depends(get_db)
@@ -43,7 +66,10 @@ def create_or_get_conversation(
     conv = conv_service.get_or_create_conversation(db, user.id, payload.other_user_id)
     db.commit()
     other = db.get(User, payload.other_user_id)
-    return ConversationOut(id=conv.id, other_user=other, last_message=conv_service.last_message(db, conv.id), created_at=conv.created_at)
+    return ConversationOut(
+        id=conv.id, other_user=other, last_message=conv_service.last_message(db, conv.id),
+        unread_count=conv_service.unread_count(db, conv.id, user.id), created_at=conv.created_at,
+    )
 
 
 @router.get("", response_model=list[ConversationOut])
@@ -55,9 +81,25 @@ def list_conversations(user: User = Depends(get_current_user), db: DbSession = D
         other = db.get(User, other_id) if other_id else None
         if other is None:
             continue
-        out.append(ConversationOut(id=conv.id, other_user=other, last_message=conv_service.last_message(db, conv.id), created_at=conv.created_at))
+        out.append(ConversationOut(
+            id=conv.id, other_user=other, last_message=conv_service.last_message(db, conv.id),
+            unread_count=conv_service.unread_count(db, conv.id, user.id), created_at=conv.created_at,
+        ))
     out.sort(key=lambda c: c.last_message.created_at if c.last_message else c.created_at, reverse=True)
     return out
+
+
+# NOTE: /unread-count must be registered before /{conversation_id} -- see
+# the identical reasoning at /me/skills vs /{user_id}/skills in
+# app/api/routes/users.py. "unread-count" is a syntactically valid match
+# for {conversation_id} and would 422 trying to parse it as an int if the
+# dynamic route were registered first.
+@router.get("/unread-count")
+def get_total_unread(user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
+    """Lightweight endpoint for the sidebar badge's initial value (the WS
+    push keeps it live after that) -- avoids fetching the full
+    conversation list just to sum unread counts."""
+    return {"unread_total": conv_service.total_unread(db, user.id)}
 
 
 @router.get("/{conversation_id}", response_model=ConversationOut)
@@ -68,7 +110,19 @@ def get_conversation(conversation_id: int, user: User = Depends(get_current_user
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     other_id = conv_service.other_participant_id(db, conv.id, user.id)
     other = db.get(User, other_id) if other_id else None
-    return ConversationOut(id=conv.id, other_user=other, last_message=conv_service.last_message(db, conv.id), created_at=conv.created_at)
+    return ConversationOut(
+        id=conv.id, other_user=other, last_message=conv_service.last_message(db, conv.id),
+        unread_count=conv_service.unread_count(db, conv.id, user.id), created_at=conv.created_at,
+    )
+
+
+@router.post("/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+def mark_conversation_read(conversation_id: int, user: User = Depends(get_current_user), db: DbSession = Depends(get_db)):
+    try:
+        conv_service.assert_participant(db, conversation_id, user.id)
+    except conv_service.NotAParticipantError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+    conv_service.mark_read(db, conversation_id, user.id)
 
 
 @router.get("/{conversation_id}/messages", response_model=list[MessageOut])
@@ -174,4 +228,8 @@ async def upload_voice_note(
         {"type": "chat", "message": MessageOut.model_validate(message).model_dump(mode="json")},
         exclude_user_id=user.id,
     )
+
+    other_id = conv_service.other_participant_id(db, conversation_id, user.id)
+    if other_id is not None:
+        await _notify_new_message(db, conversation_id, user, other_id, "Voice note")
     return message

@@ -21,7 +21,7 @@ export default function VerifyOtpPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const { applyTokens } = useAuth();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(state?.verificationCode || "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
@@ -70,11 +70,15 @@ export default function VerifyOtpPage() {
     setError("");
     setResending(true);
     try {
-      await apiJson("/api/auth/resend-otp", { method: "POST", body: JSON.stringify({ email: state.email }) });
+      const res = await apiJson("/api/auth/resend-otp", { method: "POST", body: JSON.stringify({ email: state.email }) });
       setResent(true);
       setCooldown(RESEND_COOLDOWN_SECONDS);
       setExpiresIn(CODE_EXPIRY_SECONDS);
-      setCode("");
+      if (res.verification_code) {
+        setCode(res.verification_code);
+      } else {
+        setCode("");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -90,6 +94,12 @@ export default function VerifyOtpPage() {
         To finish creating your account, enter the 6-character verification code we sent to{" "}
         <strong>{state.email}</strong>.
       </p>
+
+      {state?.verificationCode && (
+        <div className="card" style={{ padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-5)", borderColor: "var(--color-leaf)", color: "var(--color-leaf)", fontSize: "var(--text-body-sm)" }}>
+          Development mode is using the local OTP fallback. Your code is already filled in below.
+        </div>
+      )}
 
       <p
         style={{

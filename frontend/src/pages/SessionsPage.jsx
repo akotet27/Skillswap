@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiJson } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import ReportUserModal from "../components/ReportUserModal";
+import { formatCredits } from "../utils/credits";
 
 function fmt(iso) {
   return new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -12,6 +14,8 @@ export default function SessionsPage() {
   const [credits, setCredits] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null); // { sessionId, otherName } | null
+  const [reportedIds, setReportedIds] = useState(new Set());
 
   async function load() {
     try {
@@ -61,7 +65,12 @@ export default function SessionsPage() {
       {credits && (
         <div className="card" style={{ padding: "var(--space-5) var(--space-6)", marginBottom: "var(--space-6)", display: "inline-block" }}>
           <span className="eyebrow">Credit balance</span>
-          <p style={{ margin: 0, fontSize: "var(--text-heading-sm)", color: "var(--color-electric-blue)", fontWeight: 600 }}>{credits.balance}</p>
+          <p style={{ margin: 0, fontSize: "var(--text-heading-sm)", color: "var(--color-electric-blue)", fontWeight: 600 }}>{formatCredits(credits.balance)}</p>
+          {credits.pending_balance > 0 && (
+            <p className="field-hint" style={{ margin: "var(--space-1) 0 0" }}>
+              {formatCredits(credits.pending_balance)} teaching credit{credits.pending_balance === 1 ? "" : "s"} pending escrow
+            </p>
+          )}
         </div>
       )}
 
@@ -76,6 +85,8 @@ export default function SessionsPage() {
           const iAmLearner = learner?.user.id === me.id;
           const started = new Date(s.scheduled_start_utc).getTime() <= Date.now();
           const canWrapUp = iAmLearner && started && (s.status === "scheduled" || s.status === "in_progress");
+          const other = iAmLearner ? teacher : learner;
+          const canReport = s.status === "completed" && !reportedIds.has(s.id) && other;
           return (
             <div key={s.id} className="card" style={{ padding: "var(--space-6)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
               <div>
@@ -96,11 +107,34 @@ export default function SessionsPage() {
                     Cancel
                   </button>
                 )}
+                {canReport && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setReportTarget({ sessionId: s.id, otherName: other.user.name })}
+                  >
+                    Report
+                  </button>
+                )}
+                {s.status === "completed" && reportedIds.has(s.id) && (
+                  <span className="field-hint">Reported</span>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {reportTarget && (
+        <ReportUserModal
+          sessionId={reportTarget.sessionId}
+          otherName={reportTarget.otherName}
+          onClose={() => setReportTarget(null)}
+          onSubmitted={() => {
+            setReportedIds((prev) => new Set(prev).add(reportTarget.sessionId));
+            setReportTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }

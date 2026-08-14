@@ -69,3 +69,20 @@ class SessionParticipant(Base):
     # one-directional. Required by SessionParticipantOut (schemas/session.py),
     # which nests a full UserOut per participant.
     user: Mapped["User"] = relationship()  # noqa: F821
+
+
+class CallAttendance(Base):
+    """One join->leave span in a session's video room, for a real (non-guest)
+    participant -- feeds the duration-based partial-credit calculation at
+    completion (see services/attendance.py, services/credits.py, and the
+    join/disconnect handlers in api/routes/signaling_ws.py). A participant
+    can have multiple rows per session if they reconnect; `left_at` is null
+    while they're still connected, and force-closed at completion time if
+    the socket is still open then (see booking.py:complete_session)."""
+    __tablename__ = "call_attendance"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

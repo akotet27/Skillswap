@@ -16,7 +16,7 @@ from app.db.session import get_db
 from app.models.credit import CreditTransaction
 from app.models.user import User
 from app.schemas.credit import CreditSummaryOut
-from app.services.credits import get_balance
+from app.services.credits import get_balance, get_pending_balance
 
 router = APIRouter(prefix="/api/credits", tags=["credits"])
 
@@ -26,4 +26,4 @@ def my_credit_summary(user: User = Depends(get_current_user), db: DbSession = De
     txns = db.scalars(
         select(CreditTransaction).where(CreditTransaction.user_id == user.id).order_by(CreditTransaction.created_at.desc())
     ).all()
-    return CreditSummaryOut(balance=get_balance(db, user.id), transactions=txns)
+    return CreditSummaryOut(balance=get_balance(db, user.id), pending_balance=get_pending_balance(db, user.id), transactions=txns)

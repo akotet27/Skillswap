@@ -62,6 +62,7 @@ export default function ConversationsPage() {
               <strong>{c.other_user.name}</strong>
               <p style={{ margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview(c.last_message)}</p>
             </div>
+            {c.unread_count > 0 && <span className="unread-badge">{c.unread_count > 99 ? "99+" : c.unread_count}</span>}
           </Link>
         ))}
       </div>

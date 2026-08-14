@@ -45,7 +45,14 @@ def create_swap_request(
     # wouldn't bite until the *recipient* tried to accept -- surfacing a
     # confusing "not enough credits" error to someone whose credits were
     # never the issue.
-    if credits.get_balance(db, user.id) < 1:
+    available = credits.get_balance(db, user.id)
+    pending = credits.get_pending_balance(db, user.id)
+    if available < 1:
+        if pending > 0:
+            raise HTTPException(
+                status.HTTP_402_PAYMENT_REQUIRED,
+                "You have a teaching credit pending escrow. It becomes available 24 hours after the session is marked complete.",
+            )
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED,
             "You don't have an available credit yet -- teach a session first to earn one before booking.",

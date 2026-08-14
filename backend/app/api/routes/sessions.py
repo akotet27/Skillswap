@@ -10,11 +10,14 @@ from app.core.config import settings
 from app.core.deps import get_current_user
 from app.core.timeutils import as_utc
 from app.db.session import get_db
+from app.models.report import Report
 from app.models.session import Session, SessionParticipant, ParticipantRole, SessionStatus
 from app.models.user import User
+from app.schemas.report import ReportCreate, ReportOut
 from app.schemas.session import SessionOut
 from app.schemas.video import GuestInviteOut
 from app.services import booking, video as video_service
+from app.tasks.badge_tasks import award_session_badges
 from app.tasks.email_tasks import send_cancellation_email
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -99,7 +102,42 @@ def complete_session(session_id: int, user: User = Depends(get_current_user), db
     booking.complete_session(db, session_id)
     db.commit()
     db.refresh(session)
+    award_session_badges.delay(session.id)
     return session
+
+
+@router.post("/{session_id}/report", response_model=ReportOut, status_code=status.HTTP_201_CREATED)
+def report_session_participant(
+    session_id: int, payload: ReportCreate, user: User = Depends(get_current_user), db: DbSession = Depends(get_db)
+):
+    """Available after a completed session -- reports the *other* real
+    participant (never a guest, never yourself). Lands in the admin
+    moderation queue (see app/api/routes/admin.py); this endpoint only
+    ever creates the Report, resolving it is an admin action."""
+    session = db.get(Session, session_id)
+    if session is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    if session.status != SessionStatus.COMPLETED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You can only report a session after it's completed")
+
+    my_participation = next((p for p in session.participants if p.user_id == user.id), None)
+    if my_participation is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You weren't part of this session")
+
+    other = next(
+        (p for p in session.participants if p.user_id != user.id and p.role != ParticipantRole.GUEST), None
+    )
+    if other is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "No one to report in this session")
+
+    report = Report(
+        session_id=session_id, reporter_id=user.id, reported_user_id=other.user_id,
+        reason=payload.reason, note=payload.note,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    return report
 
 
 @router.post("/{session_id}/guest-invite", response_model=GuestInviteOut)

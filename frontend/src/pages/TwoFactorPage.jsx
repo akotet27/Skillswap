@@ -26,7 +26,7 @@ export default function TwoFactorPage() {
         body: JSON.stringify({ user_id: state.userId, code: code.trim() }),
       });
       await applyTokens(res.access_token, res.refresh_token);
-      navigate("/profile");
+      navigate("/home");
     } catch (err) {
       setError(err.message);
     } finally {

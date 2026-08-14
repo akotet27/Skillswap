@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, BellRing, BellOff } from "lucide-react";
 import { apiJson, apiFetch, API_BASE } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import SkillAutocompleteInput from "../components/SkillAutocompleteInput";
@@ -8,11 +8,22 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
+  const badges = user.badges || [];
 
   return (
     <div className="container" style={{ paddingTop: "var(--space-10)", paddingBottom: "var(--space-20)" }}>
       <p className="eyebrow">Your profile</p>
       <h1>Hi, {user.name.split(" ")[0]}</h1>
+
+      {badges.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", marginBottom: "var(--space-5)" }}>
+          {badges.map((badge) => (
+            <span key={badge.badge_key} className="tag tag-neutral" title={badge.label}>
+              {badge.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: "grid", gap: "var(--space-6)", gridTemplateColumns: "minmax(0,1fr)", maxWidth: 720 }}>
         <ProfileDetailsCard user={user} onSaved={refreshUser} />
@@ -95,13 +106,43 @@ function SkillsCard() {
   const [newSkill, setNewSkill] = useState("");
   const [type, setType] = useState("have");
   const [error, setError] = useState("");
+  const [waitlisted, setWaitlisted] = useState(new Set());
 
   async function load() {
     setSkills(await apiJson("/api/users/me/skills"));
   }
+  async function loadWaitlist() {
+    const rows = await apiJson("/api/skills/me/waitlist");
+    setWaitlisted(new Set(rows.map((r) => r.skill.id)));
+  }
   useEffect(() => {
     load();
+    loadWaitlist();
   }, []);
+
+  // "Notify me when someone can teach this" -- only relevant for 'want'
+  // tags with no current teacher (has_teacher === false, see UserSkillOut).
+  // Idempotent join server-side, but we still track state client-side so
+  // the button can read "On the waitlist" without a round trip.
+  async function toggleWaitlist(skillId) {
+    const onList = waitlisted.has(skillId);
+    setWaitlisted((prev) => {
+      const next = new Set(prev);
+      if (onList) next.delete(skillId);
+      else next.add(skillId);
+      return next;
+    });
+    try {
+      if (onList) {
+        await apiFetch(`/api/skills/${skillId}/waitlist`, { method: "DELETE" });
+      } else {
+        await apiJson(`/api/skills/${skillId}/waitlist`, { method: "POST" });
+      }
+    } catch (err) {
+      setError(err.message);
+      await loadWaitlist(); // revert to server truth on failure
+    }
+  }
 
   // Takes the name explicitly (not read from `newSkill` state) so it works
   // the same whether called from the form's submit (typed text + Enter/Add)
@@ -180,28 +221,46 @@ function SkillsCard() {
       </div>
       <div>
         <p className="eyebrow" style={{ marginBottom: "var(--space-2)" }}>I want to learn</p>
-        <TagList items={want} tagClass="tag-learn" onRemove={removeSkill} empty="No learning goals yet." />
+        <TagList items={want} tagClass="tag-learn" onRemove={removeSkill} empty="No learning goals yet." waitlisted={waitlisted} onToggleWaitlist={toggleWaitlist} />
       </div>
     </section>
   );
 }
 
-function TagList({ items, tagClass, onRemove, empty }) {
+function TagList({ items, tagClass, onRemove, empty, waitlisted, onToggleWaitlist }) {
   if (items.length === 0) return <p className="field-hint">{empty}</p>;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-      {items.map((s) => (
-        <span key={s.id} className={`tag ${tagClass}`}>
-          {s.skill.name}
-          <button
-            onClick={() => onRemove(s.id)}
-            aria-label={`Remove ${s.skill.name}`}
-            style={{ display: "inline-flex", border: "none", background: "none", cursor: "pointer", color: "inherit", padding: 0, marginLeft: "var(--space-1)" }}
-          >
-            <X size={14} />
-          </button>
-        </span>
-      ))}
+      {items.map((s) => {
+        const onList = waitlisted?.has(s.skill.id);
+        return (
+          <span key={s.id} className={`tag ${tagClass}`} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+            {s.skill.name}
+            <button
+              onClick={() => onRemove(s.id)}
+              aria-label={`Remove ${s.skill.name}`}
+              style={{ display: "inline-flex", border: "none", background: "none", cursor: "pointer", color: "inherit", padding: 0, marginLeft: "var(--space-1)" }}
+            >
+              <X size={14} />
+            </button>
+            {s.has_teacher === false && (
+              <button
+                onClick={() => onToggleWaitlist(s.skill.id)}
+                className="field-hint"
+                title={onList ? "You'll be emailed when someone can teach this — click to cancel" : "No one teaches this yet — get notified when someone does"}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4, border: "none", cursor: "pointer",
+                  background: onList ? "var(--color-electric-blue)" : "transparent", color: onList ? "#fff" : "inherit",
+                  borderRadius: "var(--radius-pill)", padding: "2px 8px", marginLeft: "var(--space-1)", fontSize: "var(--text-eyebrow)",
+                }}
+              >
+                {onList ? <BellRing size={12} /> : <BellOff size={12} />}
+                {onList ? "Notify me: on" : "Notify me"}
+              </button>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }

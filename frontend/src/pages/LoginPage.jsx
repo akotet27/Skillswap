@@ -1,16 +1,27 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { apiJson, API_BASE } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import MatchClusterIllustration from "../components/MatchClusterIllustration";
+import PasswordInput from "../components/PasswordInput";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { applyTokens } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("oauth_error") === "google_state_mismatch") {
+      setError("Google sign-in was interrupted. Please try again.");
+    } else if (params.get("oauth_error") === "account_suspended") {
+      setError("This account has been suspended.");
+    }
+  }, [location.search]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -23,7 +34,7 @@ export default function LoginPage() {
         return;
       }
       await applyTokens(res.access_token, res.refresh_token);
-      navigate("/profile");
+      navigate("/home");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,7 +75,7 @@ export default function LoginPage() {
           </div>
           <div className="field">
             <label htmlFor="password">Password</label>
-            <input id="password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <PasswordInput id="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </div>
           <button className="btn btn-primary btn-block" disabled={submitting}>
             {submitting ? "Logging in…" : "Log in"}

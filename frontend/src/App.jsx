@@ -1,12 +1,15 @@
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { SidebarProvider, useSidebar } from "./context/SidebarContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
 import SidebarDrawer from "./components/SidebarDrawer";
+import AppSidebar from "./components/AppSidebar";
+import MessageToast from "./components/MessageToast";
 
-// The login page is a deliberate exception to the global nav -- it wants
+// The login page is a deliberate exception to the guest nav -- it wants
 // a minimal, focused frame (just a way back home), not the full pill nav
 // with links to pages you can't use yet since you're not signed in.
 const ROUTES_WITHOUT_NAVBAR = ["/login"];
@@ -17,14 +20,49 @@ function ConditionalNavbar() {
   return <Navbar />;
 }
 
-// Everything but the drawer itself lives in here, so opening the drawer
-// can shift this whole wrapper over (margin-left, see .app-shell.shifted
-// in global.css) instead of the drawer floating on top of it.
-function AppShell({ children }) {
-  const { open } = useSidebar();
-  return <div className={`app-shell${open ? " shifted" : ""}`}>{children}</div>;
+// "/" is the public marketing pitch -- an already-authenticated user must
+// never land back on it (same as Instagram never re-shows a logged-in
+// user its own sign-up page). Bounces straight to /home instead of
+// rendering LandingPage whenever a real user session exists.
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to="/home" replace />;
+  return <LandingPage />;
 }
 
+// Two completely different shells depending on auth state -- an
+// authenticated user gets the persistent AppSidebar (always visible, no
+// toggle) and never sees the guest pill-nav/hamburger-drawer combo, and
+// vice versa. Loading is treated as "guest" briefly (ProtectedRoute
+// already gates the actual page content during that window, so there's
+// nothing unsafe about it) rather than flashing a third loading shell.
+function AppRoot({ children }) {
+  const { user, loading } = useAuth();
+  const { open } = useSidebar();
+
+  if (user && !loading) {
+    return (
+      <>
+        <AppSidebar />
+        <div className="app-shell authed">{children}</div>
+        <MessageToast />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <SidebarDrawer />
+      <div className={`app-shell${open ? " shifted" : ""}`}>
+        <ConditionalNavbar />
+        {children}
+      </div>
+    </>
+  );
+}
+
+import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import SignupPage from "./pages/SignupPage";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
@@ -44,19 +82,32 @@ import ConversationsPage from "./pages/ConversationsPage";
 import ChatPage from "./pages/ChatPage";
 import SessionRoomPage from "./pages/SessionRoomPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
+import AdminPage from "./pages/AdminPage";
 import { PrivacyPolicyPage, TermsPage } from "./pages/LegalPage";
 
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter 
+        future={{ 
+          v7_relativeSplatPath: true, 
+          v7_startTransition: true 
+        }}
+      >
         <AuthProvider>
+          <NotificationsProvider>
           <SidebarProvider>
-            <SidebarDrawer />
-            <AppShell>
-              <ConditionalNavbar />
+            <AppRoot>
               <Routes>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<RootRoute />} />
+                <Route
+                  path="/home"
+                  element={
+                    <ProtectedRoute>
+                      <HomePage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
                 <Route path="/login" element={<LoginPage />} />
@@ -147,9 +198,18 @@ export default function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute adminOnly>
+                      <AdminPage />
+                    </ProtectedRoute>
+                  }
+                />
               </Routes>
-            </AppShell>
+            </AppRoot>
           </SidebarProvider>
+          </NotificationsProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

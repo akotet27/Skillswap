@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { apiJson } from "../api/client";
+import PasswordInput from "./PasswordInput";
 
 /** Lives in Settings, not Profile -- account security, not public
  * identity. Renders an actual scannable QR code from the otpauth:// URI
@@ -55,7 +56,7 @@ export default function TwoFactorCard({ user, onChanged }) {
           <p>2FA is currently <strong>enabled</strong> on your account.</p>
           <div className="field">
             <label htmlFor="pw">Confirm your password to disable</label>
-            <input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput id="pw" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <button className="btn btn-secondary">Disable 2FA</button>
         </form>

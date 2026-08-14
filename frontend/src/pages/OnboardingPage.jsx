@@ -89,7 +89,7 @@ export default function OnboardingPage() {
   async function finish() {
     if (draftTeach.trim()) await addSkill(teach, setTeach, draftTeach, setDraftTeach, "have");
     if (draftLearn.trim()) await addSkill(learn, setLearn, draftLearn, setDraftLearn, "want");
-    navigate("/browse");
+    navigate("/home");
   }
 
   return (

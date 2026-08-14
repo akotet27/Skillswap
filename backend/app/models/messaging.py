@@ -24,6 +24,13 @@ class ConversationParticipant(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True, nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    # Unread-count tracking lives on the existing per-participant row
+    # rather than a new table -- one already exists per (conversation,
+    # user) pair. NULL means "never opened this conversation" (everything
+    # unread); set to now() whenever the user views it (see
+    # POST /{id}/read). A message is unread for a participant if its
+    # created_at is after their last_read_at (or they have none at all).
+    last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     conversation: Mapped["Conversation"] = relationship(back_populates="participants")
 
@@ -31,6 +38,13 @@ class ConversationParticipant(Base):
 class MessageType(str, enum.Enum):
     TEXT = "text"
     VOICE = "voice"
+    # System-generated, not authored by either participant (e.g. "X
+    # joined the call") -- rendered as a centered muted pill, never a
+    # left/right-aligned bubble. `sender_id` is meaningless for these
+    # (still required by the column, so the participant who triggered the
+    # event is stored there, but the UI never attributes it to them as if
+    # they'd typed it).
+    SYSTEM = "system"
 
 
 class Message(Base):

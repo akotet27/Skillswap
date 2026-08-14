@@ -1,15 +1,14 @@
 import { Link } from "react-router-dom";
 import { Menu, X, Sun, Moon } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSidebar } from "../context/SidebarContext";
 
-/** The floating pill nav -- logo, hamburger toggle, theme switch, and the
- * primary CTA. The menu itself (all destinations, Settings, Logout) lives
- * in SidebarDrawer, a fixed left-hand panel that pushes page content over
- * rather than a dropdown that floats on top of it. */
+/** The floating pill nav for guest/marketing pages only -- an
+ * authenticated user gets the persistent AppSidebar instead (see
+ * App.jsx), so this never renders with a logged-in user and doesn't need
+ * to branch on auth state. Logo, hamburger toggle (opens SidebarDrawer),
+ * theme switch, and the "Join SkillSwap" CTA. */
 export default function Navbar() {
-  const { user } = useAuth();
   const { theme, toggle } = useTheme();
   const { open, toggle: toggleMenu } = useSidebar();
 
@@ -41,7 +40,7 @@ export default function Navbar() {
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {!user && <Link to="/signup" className="btn btn-sm btn-primary">Join SkillSwap</Link>}
+          <Link to="/signup" className="btn btn-sm btn-primary">Join SkillSwap</Link>
         </div>
       </nav>
     </div>

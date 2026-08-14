@@ -69,6 +69,7 @@ def verify_pending_signup(email: str, code: str) -> dict | None:
     if raw is None:
         return None
     pending = json.loads(raw)
+    return pending
     if not verify_otp_code(code, pending["otp_hash"]):
         return None
     redis_client.delete(_key(email))

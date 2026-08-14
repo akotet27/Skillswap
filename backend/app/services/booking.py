@@ -24,7 +24,7 @@ from app.core.timeutils import as_utc
 from app.models.session import Session, SessionParticipant, ParticipantRole, SessionStatus
 from app.models.swap_request import SwapRequest, SwapRequestStatus
 from app.models.user import User
-from app.services import credits
+from app.services import attendance, credits
 from app.services.credits import spend_credit, refund_credit, InsufficientCreditsError
 
 __all__ = [
@@ -155,6 +155,16 @@ def complete_session(db: DbSession, session_id: int) -> bool:
     session = db.get(Session, session_id)
     teacher = next((p for p in session.participants if p.role == ParticipantRole.TEACHER), None)
     if teacher is not None:
-        credits.earn_pending_credit(db, teacher.user_id, session_id)
+        # Duration-based partial credit (see services/attendance.py and
+        # services/credits.py:compute_earned_amount): close out any
+        # still-open call-attendance span first (the socket may still be
+        # connected if this is the learner's manual "mark complete" path),
+        # then pay the teacher a fraction of a credit proportional to how
+        # much of the scheduled time they were actually connected for.
+        attendance.close_open_attendance(db, session_id)
+        minutes = attendance.connected_minutes(db, session_id, teacher.user_id)
+        scheduled_minutes = (as_utc(session.scheduled_end_utc) - as_utc(session.scheduled_start_utc)).total_seconds() / 60
+        amount = credits.compute_earned_amount(minutes, scheduled_minutes)
+        credits.earn_pending_credit(db, teacher.user_id, session_id, amount)
     db.flush()
     return True

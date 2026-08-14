@@ -18,6 +18,8 @@ celery_app = Celery(
     include=[
         "app.tasks.email_tasks",
         "app.tasks.credit_tasks",
+        "app.tasks.badge_tasks",
+        "app.tasks.waitlist_tasks",
     ],
 )
 
@@ -38,5 +40,9 @@ celery_app.conf.beat_schedule = {
     "release-pending-credits-hourly": {
         "task": "app.tasks.credit_tasks.release_available_credits",
         "schedule": crontab(minute=0),  # top of every hour
+    },
+    "notify-skill-waitlist-daily": {
+        "task": "app.tasks.waitlist_tasks.notify_waitlist_matches",
+        "schedule": crontab(hour=6, minute=0),  # once a day, off-peak
     },
 }

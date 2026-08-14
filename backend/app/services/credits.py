@@ -12,6 +12,7 @@ State machine (see CLAUDE_CODE_PROMPT.md, Phase 5):
   5. spend_credit() at booking time: -1 'spent' 'spent', requires balance >= 1
 """
 from datetime import datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
@@ -20,13 +21,21 @@ from app.models.credit import CreditTransaction, CreditType, CreditStatus
 
 ESCROW_HOLD_HOURS = 24
 
+# Duration-based partial credit (see services/attendance.py for the
+# join/leave tracking this is computed from): a session the teacher barely
+# showed up to shouldn't pay out a full credit, but a few seconds of a
+# dropped connection right at the start shouldn't zero it out either --
+# 5 connected minutes is the floor below which nothing was really taught.
+MIN_CREDIT_MINUTES = 5
 
-def get_balance(db: DbSession, user_id: int) -> int:
+
+def get_balance(db: DbSession, user_id: int) -> float:
     """Spendable balance: available credits not yet spent, plus rows already
     marked spent (so a completed spend doesn't change the historical total
     the SUM represents) minus refunds handled via their own 'refunded' rows.
     Net effect: SUM over every non-pending row is exactly the ledger's
-    truth, which is what "spendable balance" means here."""
+    truth, which is what "spendable balance" means here. A float, not an
+    int, since 'earned' rows can be fractional (duration-based credit)."""
     total = db.scalar(
         select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
             CreditTransaction.user_id == user_id,
@@ -34,17 +43,51 @@ def get_balance(db: DbSession, user_id: int) -> int:
                 [CreditStatus.AVAILABLE, CreditStatus.SPENT]),
         )
     )
-    return int(total or 0)
+    return round(float(total or 0), 3)
 
 
-def earn_pending_credit(db: DbSession, user_id: int, session_id: int) -> CreditTransaction:
-    """Step 2: teacher earns a credit held in escrow for 24h after a session
-    completes. Guests never call this -- only the SessionParticipant with
-    role='teacher' does (enforced by the caller)."""
+def get_pending_balance(db: DbSession, user_id: int) -> float:
+    """Credits earned from teaching but still inside the 24h escrow hold."""
+    total = db.scalar(
+        select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
+            CreditTransaction.user_id == user_id,
+            CreditTransaction.status == CreditStatus.PENDING,
+        )
+    )
+    return round(float(total or 0), 3)
+
+
+def compute_earned_amount(connected_minutes: float, scheduled_minutes: float) -> Decimal:
+    """connected_minutes / scheduled_minutes, capped at 1.0 -- a session
+    that ran the full scheduled length (or over) earns a full credit,
+    one that the teacher left early earns a fraction of it. Below
+    MIN_CREDIT_MINUTES connected, returns 0 (no real teaching happened --
+    see earn_pending_credit, which skips creating a row entirely at 0)."""
+    if connected_minutes < MIN_CREDIT_MINUTES:
+        return Decimal("0")
+    if scheduled_minutes <= 0:
+        # Shouldn't happen (booking always validates end > start), but
+        # don't divide by zero -- if they were connected at all past the
+        # floor above, treat it as a full credit rather than erroring.
+        return Decimal("1")
+    fraction = min(1.0, connected_minutes / scheduled_minutes)
+    return Decimal(str(fraction)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+
+
+def earn_pending_credit(db: DbSession, user_id: int, session_id: int, amount: Decimal) -> CreditTransaction | None:
+    """Step 2: teacher earns a (possibly partial, see compute_earned_amount)
+    credit held in escrow for 24h after a session completes. Guests never
+    call this -- only the SessionParticipant with role='teacher' does
+    (enforced by the caller). Returns None and creates no row at all for
+    amount <= 0 -- a zero-credit row would violate the ledger's own
+    CheckConstraint (which requires 'earned' rows to be > 0) and would just
+    be noise anyway."""
+    if amount <= 0:
+        return None
     now = datetime.now(timezone.utc)
     txn = CreditTransaction(
         user_id=user_id,
-        amount=1,
+        amount=amount,
         type=CreditType.EARNED,
         session_id=session_id,
         status=CreditStatus.PENDING,
@@ -114,6 +157,29 @@ def spend_credit(db: DbSession, user_id: int, session_id: int) -> CreditTransact
     db.add(txn)
     db.flush()
     return txn
+
+
+def apply_admin_adjustment(db: DbSession, user_id: int, amount: int, reason: str) -> list[CreditTransaction]:
+    """Manual correction by an admin (e.g. resolving a Report) -- the
+    honest fix for v1 having no automated dispute engine: a human adjusts
+    the ledger by hand, with `reason` always recorded so the balance
+    change is never unexplained. `amount` can be any non-zero int (the
+    caller-facing unit is "credits", not "rows"), but every row the
+    ledger's own CheckConstraint allows is still exactly +-1 -- same
+    "individual rows, never one row of amount N" convention as
+    grant_signup_bonus. Available immediately, no escrow hold (this
+    isn't earned by teaching, so the 24h trust-building hold doesn't
+    apply)."""
+    sign = 1 if amount > 0 else -1
+    rows = []
+    for _ in range(abs(amount)):
+        txn = CreditTransaction(
+            user_id=user_id, amount=sign, type=CreditType.ADJUSTMENT, status=CreditStatus.AVAILABLE, reason=reason
+        )
+        db.add(txn)
+        rows.append(txn)
+    db.flush()
+    return rows
 
 
 def refund_credit(db: DbSession, user_id: int, session_id: int) -> CreditTransaction:

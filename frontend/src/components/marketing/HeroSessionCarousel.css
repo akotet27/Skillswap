@@ -1,0 +1,244 @@
+/* Hero Session Carousel -- styles, built entirely on the project's
+   locked design tokens (see tokens.css). No hardcoded brand colors from
+   the original Claude Design export remain. */
+
+.hsc-root {
+  position: relative;
+  width: 520px;
+  max-width: 100%;
+  height: 460px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--color-midnight);
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-display);
+  color: var(--color-ink);
+}
+
+.hsc-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 700ms ease, transform 6000ms ease-out;
+}
+
+/* Gradient derived from --color-midnight (#0d111b) instead of the
+   original's arbitrary rgba(9,13,25,...) */
+.hsc-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(13, 17, 27, 0.88) 0%,
+    rgba(13, 17, 27, 0.45) 38%,
+    rgba(13, 17, 27, 0.05) 62%,
+    rgba(13, 17, 27, 0.35) 100%
+  );
+}
+
+.hsc-top-row {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hsc-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(13, 17, 27, 0.5);
+  backdrop-filter: blur(6px);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.hsc-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-coral);
+  animation: hsc-pulse 1.6s ease-in-out infinite;
+}
+
+.hsc-live-text {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.hsc-counter {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffffff;
+  background: rgba(13, 17, 27, 0.5);
+  backdrop-filter: blur(6px);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.hsc-bottom {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hsc-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hsc-caption-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hsc-caption {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.hsc-meta {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.hsc-nav-btns {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.hsc-nav-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  transition: background 0.15s ease;
+}
+
+.hsc-nav-btn-prev {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(13, 17, 27, 0.45);
+  backdrop-filter: blur(6px);
+}
+.hsc-nav-btn-prev:hover { background: rgba(13, 17, 27, 0.75); }
+.hsc-nav-btn-prev:active { background: rgba(13, 17, 27, 0.9); }
+
+/* Electric Blue is correct here: this is a small in-card icon control,
+   not a page-level primary CTA, so it doesn't violate the "primary
+   buttons must be Midnight" rule -- that rule is about page-level
+   actions like "Sign up" / "Find a Mentor". */
+.hsc-nav-btn-next {
+  background: var(--color-electric-blue);
+}
+.hsc-nav-btn-next:hover { background: var(--color-electric-blue-dark); }
+.hsc-nav-btn-next:active { background: var(--color-electric-blue-dark); }
+
+.hsc-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hsc-tag {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.hsc-tag-teach {
+  background: var(--color-teach-bg);
+  color: var(--color-teach);
+}
+
+.hsc-tag-learn {
+  background: var(--color-learn-bg);
+  color: var(--color-learn);
+}
+
+.hsc-dots {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.hsc-dot {
+  height: 8px;
+  width: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.45);
+  transition: width 300ms ease, background 300ms ease;
+}
+.hsc-dot:hover { opacity: 0.75; }
+.hsc-dot-active {
+  width: 26px;
+  background: #ffffff;
+}
+
+.hsc-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.hsc-progress-fill {
+  height: 3px;
+  background: var(--color-electric-blue);
+  width: 0%;
+  animation-name: hsc-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes hsc-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+@keyframes hsc-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hsc-slide,
+  .hsc-live-dot,
+  .hsc-progress-fill,
+  .hsc-dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}

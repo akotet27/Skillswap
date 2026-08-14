@@ -17,7 +17,7 @@ export default function OAuthCallbackPage() {
     const access = params.get("access_token");
     const refresh = params.get("refresh_token");
     if (access && refresh) {
-      applyTokens(access, refresh).then(() => navigate("/profile", { replace: true }));
+      applyTokens(access, refresh).then(() => navigate("/home", { replace: true }));
     } else {
       navigate("/login", { replace: true });
     }

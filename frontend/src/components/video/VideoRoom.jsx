@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Send, Smile, UserPlus, Loader2, AlertTriangle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Send, Smile, UserPlus, Loader2, AlertTriangle, MonitorUp } from "lucide-react";
 import { useWebRTCRoom } from "../../webrtc/useWebRTCRoom";
 import VideoTile from "./VideoTile";
 
@@ -14,11 +14,14 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
     publishStates,
     micEnabled,
     cameraEnabled,
+    screenStream,
+    screenSharing,
     mediaError,
     chatMessages,
     reactions,
     toggleMic,
     toggleCamera,
+    toggleScreenShare,
     sendChat,
     sendReaction,
     hangUp,
@@ -40,6 +43,7 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
   }
 
   const remoteEntries = [...remoteStreams.entries()];
+  const screenShareActive = screenSharing && screenStream;
 
   return (
     <div style={{ position: "relative", background: "var(--color-midnight)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
@@ -94,12 +98,42 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: remoteEntries.length === 0 ? "1fr" : "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--space-2)", padding: "var(--space-2)" }}>
-        <VideoTile stream={localStream} name={selfName} isLocal cameraOn={cameraEnabled} />
-        {remoteEntries.map(([peerId, info]) => (
-          <VideoTile key={peerId} stream={info.stream} name={info.name} publishState={publishStates.get(peerId)} />
-        ))}
-      </div>
+      {screenShareActive ? (
+        <div style={{ padding: "var(--space-2)" }}>
+          <div style={{ position: "relative" }}>
+            <VideoTile stream={screenStream} name="Your screen" status="Sharing screen" style={{ aspectRatio: "16 / 10" }} />
+            <div style={{ position: "absolute", right: "var(--space-3)", bottom: "var(--space-3)", width: "clamp(140px, 20vw, 220px)", boxShadow: "var(--shadow-hover)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
+              <VideoTile stream={localStream} name={selfName} isLocal cameraOn={cameraEnabled} style={{ aspectRatio: "4 / 3" }} />
+            </div>
+          </div>
+          {remoteEntries.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: remoteEntries.length === 1 ? "1fr" : "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+              {remoteEntries.map(([peerId, info]) => (
+                <VideoTile
+                  key={peerId}
+                  stream={info.stream}
+                  name={info.name}
+                  publishState={publishStates.get(peerId)}
+                  status={info.screenSharing ? "Sharing screen" : undefined}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: remoteEntries.length === 0 ? "1fr" : "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--space-2)", padding: "var(--space-2)" }}>
+          <VideoTile stream={localStream} name={selfName} isLocal cameraOn={cameraEnabled} />
+          {remoteEntries.map(([peerId, info]) => (
+            <VideoTile
+              key={peerId}
+              stream={info.stream}
+              name={info.name}
+              publishState={publishStates.get(peerId)}
+              status={info.screenSharing ? "Sharing screen" : undefined}
+            />
+          ))}
+        </div>
+      )}
 
       {/* control bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--space-3)", padding: "var(--space-4)" }}>
@@ -108,6 +142,9 @@ export default function VideoRoom({ roomId, token, guestToken, guestName, selfNa
         </button>
         <button className={`btn-round ${!cameraEnabled ? "btn-round-off" : ""}`} onClick={toggleCamera} aria-label={cameraEnabled ? "Turn camera off" : "Turn camera on"}>
           {cameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
+        </button>
+        <button className={`btn-round ${screenSharing ? "btn-round-off" : ""}`} onClick={toggleScreenShare} aria-label={screenSharing ? "Stop sharing your screen" : "Share your screen"}>
+          <MonitorUp size={18} />
         </button>
         <button className="btn-round" onClick={() => setChatOpen((v) => !v)} aria-label="Toggle chat">
           <Send size={18} />
