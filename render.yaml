@@ -1,14 +1,22 @@
 # Render Blueprint -- https://render.com/docs/blueprint-spec
 #
-# Provisions the three long-running processes SkillSwap's backend actually
-# needs (a real web service for FastAPI + WebSockets, plus two worker
-# processes for Celery) and a managed Postgres database. This is why the
+# Provisions the long-running processes SkillSwap's backend actually needs
+# (a real web service for FastAPI + WebSockets, plus one combined worker+beat
+# process for Celery) and a managed Postgres database. This is why the
 # backend can't live on Netlify/Vercel: those only run short-lived
 # serverless functions, and SkillSwap depends on persistent WebSocket
 # connections (chat/video signaling/presence) and a continuously-running
 # Celery worker + beat scheduler (email sends, the hourly credit-escrow
 # sweep, the daily skill-waitlist sweep) -- none of which a serverless
 # function can do.
+#
+# skillswap-api runs on Render's free web-service tier (spins down when
+# idle, cold-starts on the next request). skillswap-worker is on the
+# cheapest paid tier (Starter, ~$7/mo) because Render's Background Worker
+# service type has no free option at all -- there's no idle-traffic signal
+# to spin it down on the way there is for a web service. Worker and beat
+# are merged into that one service (see its comment below) specifically to
+# avoid paying for two of them.
 #
 # Redis is deliberately NOT provisioned here -- Render's managed Redis
 # blueprint syntax has changed over time and this file would risk going
@@ -27,7 +35,9 @@ services:
     name: skillswap-api
     runtime: python
     rootDir: backend
-    plan: starter
+    plan: free # Render's free web-service tier spins down after 15 min idle
+               # and cold-starts on the next request -- fine for now; bump to
+               # starter if that cold-start latency becomes a real problem.
     buildCommand: pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -89,15 +99,22 @@ services:
       - key: MAX_UPLOAD_MB
         value: "10"
 
-  # --- Celery worker: everything queued via .delay()/.apply_async() --
-  # OTP/reset/reminder emails, badge awarding, waitlist notifications. ---
+  # --- Celery worker + beat, combined into one process. Handles everything
+  # queued via .delay()/.apply_async() (OTP/reset/reminder emails, badge
+  # awarding, waitlist notifications) AND fires the scheduled sweeps itself
+  # (hourly credit-escrow release, daily skill-waitlist sweep) via the -B
+  # flag, instead of running beat as a separate service. Render's
+  # Background Worker service type has no free tier at all (unlike the web
+  # service above), so this is billed no matter what -- merging worker and
+  # beat into one service instead of two is purely to avoid paying for a
+  # second one, since a solo beat process barely uses any resources anyway. ---
   - type: worker
     name: skillswap-worker
     runtime: python
     rootDir: backend
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app worker --loglevel=info
+    startCommand: celery -A app.celery_app worker --beat --loglevel=info
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7
@@ -133,35 +150,6 @@ services:
         value: "true"
       - key: MAIL_SSL_TLS
         value: "false"
-
-  # --- Celery beat: fires the hourly escrow-release sweep and the daily
-  # skill-waitlist sweep on schedule (see app/celery_app.py's beat_schedule).
-  # A separate process from the worker on purpose -- beat only schedules
-  # tasks, it doesn't execute them; the worker above does the actual work. ---
-  - type: worker
-    name: skillswap-beat
-    runtime: python
-    rootDir: backend
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery_app beat --loglevel=info
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.7
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: skillswap-db
-          property: connectionString
-      - key: REDIS_URL
-        sync: false
-      - key: CELERY_BROKER_URL
-        sync: false
-      - key: CELERY_RESULT_BACKEND
-        sync: false
-      - key: JWT_SECRET_KEY
-        sync: false
 
 databases:
   - name: skillswap-db

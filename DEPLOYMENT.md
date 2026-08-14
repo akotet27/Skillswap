@@ -15,18 +15,25 @@ everything in it in one go:
 
 - `skillswap-api` — the FastAPI app + Uvicorn, serving both REST and the
   WebSocket endpoints. Its start command runs `alembic upgrade head`
-  before starting the server, so the schema is always current.
-- `skillswap-worker` — a Celery worker (OTP/reset/reminder emails, badge
-  awarding, waitlist notifications).
-- `skillswap-beat` — Celery beat, firing the hourly credit-escrow release
-  sweep and the daily skill-waitlist sweep on schedule.
-- `skillswap-db` — a managed Postgres instance (free plan), wired to all
-  three services via `fromDatabase`.
+  before starting the server, so the schema is always current. Runs on
+  Render's **free** web-service tier (spins down after 15 min idle,
+  cold-starts on the next request — fine for a demo/staging deploy).
+- `skillswap-worker` — a single Celery process running both the worker
+  (OTP/reset/reminder emails, badge awarding, waitlist notifications) and
+  the beat scheduler (`--beat` flag — fires the hourly credit-escrow
+  release sweep and the daily skill-waitlist sweep) together, so there's
+  only one background process to pay for instead of two. This one is on
+  Render's **Starter** paid tier (~$7/mo) — Render's Background Worker
+  service type has no free option at all, unlike web services, since
+  there's no idle HTTP traffic to gate a spin-down on. Render will ask for
+  a card here even if `skillswap-api` stays free.
+- `skillswap-db` — a managed Postgres instance (free plan), wired to both
+  services via `fromDatabase`.
 
 **Steps:**
 
 1. In the Render dashboard: **New +** → **Blueprint**, point it at this
-   repo. Render parses `render.yaml` and shows you the three services +
+   repo. Render parses `render.yaml` and shows you the two services +
    database it's about to create.
 2. **Create a Redis instance by hand first** (New + → Redis, a couple of
    clicks) — it's deliberately not in `render.yaml` because Render's
@@ -35,11 +42,10 @@ everything in it in one go:
 3. Fill in the env vars marked `sync: false` in `render.yaml` (Render will
    prompt for these per-service in the dashboard):
    - `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` — the Redis
-     connection string from step 2, same value in all three services.
+     connection string from step 2, same value in both services.
    - `JWT_SECRET_KEY` — auto-generated for `skillswap-api`; copy that exact
-     value into `skillswap-worker` and `skillswap-beat` too (all three
-     processes must agree on it, or tokens signed by one won't verify on
-     another).
+     value into `skillswap-worker` too (both processes must agree on it,
+     or tokens signed by one won't verify on the other).
    - `FRONTEND_ORIGIN` — your Netlify URL once you have it (step 2 below),
      e.g. `https://skillswap.netlify.app`. Needed for CORS.
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` —
@@ -104,10 +110,9 @@ to survive.
 
 ## Notes on `render.yaml`'s Python pin
 
-`PYTHON_VERSION: 3.12.7` is pinned explicitly for all three Render
-services — local development in this repo has been done against Python
-3.14, but 3.12.7 is a known-good, widely-available version on Render's
-runtime images. If a dependency in `requirements.txt` ever needs a newer
-Python, bump this value in all three services in `render.yaml` (they must
-all match — the worker and beat processes need to import the same `app`
-package as the API).
+`PYTHON_VERSION: 3.12.7` is pinned explicitly for both Render services —
+local development in this repo has been done against Python 3.14, but
+3.12.7 is a known-good, widely-available version on Render's runtime
+images. If a dependency in `requirements.txt` ever needs a newer Python,
+bump this value in both services in `render.yaml` (they must match — the
+worker process needs to import the same `app` package as the API).
