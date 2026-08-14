@@ -1,124 +1,109 @@
 # SkillSwap
 
-Peer-to-peer skill mentorship marketplace: trade time, not money — teach an
-hour, earn a credit; spend a credit to learn from someone else. Built for
-local development only.
+A peer-to-peer skill-mentorship marketplace: trade time, not money. Teach
+someone for an hour and earn a credit; spend a credit to learn from someone
+else. Matching, scheduling, real-time chat, and video calls all happen
+directly on the platform — no linking out to Zoom or Calendly.
 
-Full spec: see `CLAUDE_CODE_PROMPT (1).md` in the repo root.
+## Features
 
-## Status
+**Accounts & profiles**
+- Email/password signup with OTP email verification, Google OAuth, TOTP 2FA
+- JWT access tokens + rotating refresh tokens (with reuse detection)
+- Profile editor: photo, bio, username, timezone, age
+- "Skills I have" / "skills I want" tagging with autocomplete
+- Weekly availability editor, timezone-aware
+- Public profile pages (`/u/:username`), badges earned
+- Admin-managed suspend/ban (blocks login, reversible)
 
-Build order is followed phase-by-phase, confirming each works before moving
-on (per the spec). Current state:
+**Matching & booking**
+- Mutual-match algorithm: both sides' have/want sets must complement,
+  ranked by how much weekly availability actually overlaps
+- Swap requests with accept/decline, `.ics` calendar invites, reminder emails
+- "Notify me" waitlist for a skill nobody teaches yet — emailed once someone
+  does (daily sweep)
 
-- [x] **Project scaffold** — backend (FastAPI + SQLAlchemy + Alembic +
-      Postgres + Redis + Celery wired up), frontend (Vite + React), env
-      config, full-schema Alembic migration (verified: applies and
-      downgrades cleanly against a throwaway DB).
-- [x] **Phase 1 — Auth & Profiles** — email/password signup with alphanumeric
-      OTP verification, Google OAuth, TOTP 2FA, JWT access + rotating
-      refresh tokens (with reuse detection), password reset via emailed
-      link, profile editor (photo/name/timezone), skills-I-have/want tags,
-      weekly availability editor.
-- [x] **Phase 2 — Matching & Booking** — mutual-match algorithm (both sides'
-      have/want sets must complement) ranked by weekly availability overlap
-      in minutes (DST-aware via `zoneinfo`), Redis-cached browse endpoint,
-      booking flow (view a match's availability, pick a slot, send a
-      `SwapRequest`), accept/decline, `.ics` calendar invite emails +
-      scheduled reminder emails on acceptance, cancellation with credit
-      refund. Verified with an end-to-end functional test (matching →
-      credit-gated booking → accept → cancel/refund) against a throwaway
-      DB, not just an import check.
-- [x] **Phase 3 — Messaging** — real-time text chat over a FastAPI
-      `WebSocket` (`/ws/conversations/{id}`, token passed as a query param
-      since browsers can't set custom WS handshake headers), backed by the
-      same hand-rolled `ConnectionManager` that Phase 4's signaling will
-      reuse; voice notes via `MediaRecorder` → upload → inline `<audio>`
-      player; a "Join session" link that activates 5 minutes before
-      `scheduled_start_utc`. Verified against a **real running uvicorn
-      server with two genuine WebSocket clients** (not a mocked test
-      harness) — this caught and fixed a real bug (message history could
-      return out of order when two messages landed in the same
-      one-second timestamp tick; fixed by adding `id` as a tiebreaker).
-- [ ] Phase 4 — Signaling server + custom WebRTC video
-- [ ] Phase 5 — Credit/Escrow system (ledger + service layer scaffolded
-      already, in `backend/app/services/credits.py`, since the schema and
-      Celery Beat sweep needed to exist from the start — wiring it into the
-      booking/session flow is still Phase 5's job)
-- [ ] Phase 6 — Ratings
-- [ ] Cross-cutting hardening pass
+**Credits & escrow**
+- Immutable ledger: every row is a single `+1`/`-1` (or a fraction for
+  duration-based earning, see below) — no row is ever edited in place
+- Teaching a session earns a credit, held in escrow for 24h after
+  completion before it's spendable
+- **Duration-based partial credit**: what you earn is proportional to how
+  much of the scheduled time you were actually connected for (capped at a
+  full credit at 100%, nothing at all under 5 connected minutes) — tracked
+  from real join/leave timestamps on the video call, not just "did the
+  session happen"
+- Manual admin credit adjustments (with a required reason, logged)
 
-### Deviations from the spec so far
+**Messaging**
+- Real-time chat over WebSocket, typing indicators, online presence
+- **End-to-end encrypted text messages** — ECDH (P-256) key exchange +
+  AES-GCM, keys generated and kept in the browser (IndexedDB), the server
+  only ever stores/relays ciphertext
+- Edit and delete your own messages (soft-delete, "message was deleted"
+  placeholder)
+- Voice notes and file attachments, with a preview-before-send step for
+  files and inline image thumbnails
+- Unread badges + toast notifications that follow you around the app, not
+  just inside an open conversation
+- WhatsApp/Telegram-style split view: conversation list + open chat side
+  by side, single-pane on narrow screens
 
-- **Email backend defaults to console/log, not real SMTP** — added an
-  `EMAIL_BACKEND` setting (`console` default, `smtp` to actually send) so
-  dev/testing never sends real mail unless explicitly opted in. Not in the
-  original spec but requested mid-build; kept as a permanent safety default
-  rather than a one-off.
-- Rate limiting (`slowapi`) and the login audit log are applied to the auth
-  router now (signup/login/OTP/refresh endpoints) since they're
-  security-critical from day one, rather than being deferred entirely to
-  the final hardening pass — the rest of the cross-cutting checklist
-  (full Redis caching, security headers, PWA/SEO polish across every page,
-  anti-scraping tiers) is still deferred to that pass as planned.
-- **A `GET /api/credits/me` read-only balance/history endpoint was pulled
-  forward from Phase 5** — Phase 2's booking flow can fail with 402 when
-  the learner has no available credit, and the UI needs somewhere to show
-  *why*. Phase 5 proper (the escrow sweep, session-completion crediting)
-  is still unbuilt; only the read path exists so far, all writes still go
-  through `app/services/credits.py` called from booking/cancellation.
-- **v1's credit system has a known cold-start gap, left unfixed on
-  purpose**: a brand-new install has zero credits in circulation, so the
-  very first session anyone books *as a learner* is blocked by the credit
-  gate until someone has taught (and had a credit clear escrow) first.
-  The spec explicitly rules out a starting bonus balance, so this is
-  intentional — documented in `app/services/booking.py` — but worth
-  knowing about before a real demo (seed one user with a manual
-  `CreditTransaction` if you need to demo booking immediately).
-- **Role convention for who teaches vs. learns** wasn't fully spelled out
-  in the schema, so I picked one and documented it in
-  `app/services/booking.py`: the `SwapRequest` *recipient* (whose
-  availability you booked against) is the teacher; the *requester* is the
-  learner who spends a credit. `skill_taught_id` records what the
-  requester offers in return for a *separate future* session — v1 doesn't
-  auto-create that reverse session.
-- **The visual design system was replaced mid-build**, twice. What's live
-  now: white flat header, brand blue (`#2f7cf6`) as the primary
-  interactive color (filled buttons, links, "mine" chat bubbles), a soft
-  blue-tinted page canvas, and a mocked "live session" card on the
-  homepage instead of stock photography — adapted from a reference the
-  user shared, not copied pixel-for-pixel (e.g. button hierarchy is
-  SkillSwap's own filled/outline convention, not the reference's). This
-  **supersedes** the original spec's "Acctual-derived, 90% achromatic,
-  Midnight-only buttons, floating pill nav" system — all tokens live in
-  `frontend/src/styles/tokens.css`, all shared component styles in
-  `frontend/src/styles/global.css`, so this cascades automatically to
-  every page. The teach/learn tag pair (green/violet) is unchanged
-  throughout, since the new reference has no equivalent concept.
-- **Icons are `lucide-react` throughout, never emoji** — added mid-build
-  per explicit instruction; check before reaching for an emoji in any new
-  UI (Phase 4's call controls, Phase 6's rating stars, etc.).
+**Video calls**
+- Custom peer-to-peer WebRTC, full-mesh signaling over a hand-rolled
+  `ConnectionManager` (no third-party video SDK)
+- Screen sharing, in-call chat, emoji reactions, guest invite links
+  (join without an account)
+- Instant join — no lead-time gate, either side can start whenever they're
+  both ready
+- **Minimize a call to a floating corner window** and keep using the rest
+  of the app (check messages, browse, etc.) without hanging up — the call
+  survives navigating away from its own page
+
+**Moderation & admin**
+- Report a user after a completed session; admin queue to review and
+  resolve reports
+- Suspend/unsuspend accounts, manual credit adjustments
+- Admin analytics: signups over time, most-taught/wanted skills, sessions
+  completed, credits in circulation, average time-to-first-match
+
+**Known gap:** ratings are scaffolded (model + public-profile display of
+`rating_average`/`rating_count`) but there's no endpoint to actually submit
+one yet — every profile currently shows zero ratings. Semantic
+(embedding-based) skill matching was scoped but not built — it needs
+`sentence-transformers`/`torch`, a genuinely heavy dependency that wasn't
+worth pulling in for this pass.
+
+## Tech stack
+
+- **Backend**: FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL, Redis, Celery
+  (email sends, the hourly credit-escrow sweep, the daily waitlist sweep)
+- **Frontend**: React + Vite, React Router, Recharts (admin/home charts)
+- **Real-time**: raw WebSockets for chat, video signaling, presence, and
+  notifications — one shared connection-manager abstraction, not separate
+  systems per feature
 
 ## Prerequisites
 
-- Python 3.11+ (dev/testing here used 3.14 — very new, so a couple of
-  packages needed a pin: `passlib`'s bcrypt backend detection breaks on
-  `bcrypt>=4.1`, hence the `bcrypt==4.0.1` pin in `requirements.txt`; if
-  you hit a `password cannot be longer than 72 bytes` error from passlib
-  on login/signup, that pin didn't take — reinstall it explicitly)
+- Python 3.11+ (developed against 3.14; if you're on something older and
+  hit a `password cannot be longer than 72 bytes` error from passlib on
+  login/signup, reinstall the exact `bcrypt==4.0.1` pin in
+  `requirements.txt` — newer bcrypt breaks passlib's backend detection)
 - Node.js + **pnpm** (not npm) — run `pnpm approve-builds` after
   `pnpm install` the first time, or Vite's `esbuild` postinstall script
-  won't run and `pnpm build`/`pnpm dev` will fail
-- PostgreSQL running locally, Redis running locally
+  won't run
+- PostgreSQL and Redis running locally (Docker is the easiest way)
 
-## Backend setup
+## Quick start
+
+**Backend:**
 
 ```bash
 cd backend
 python -m venv .venv
 ./.venv/Scripts/activate        # Windows; `source .venv/bin/activate` on macOS/Linux
 pip install -r requirements.txt
-cp .env.example .env            # fill in DATABASE_URL etc.
+cp .env.example .env            # fill in DATABASE_URL, JWT_SECRET_KEY, etc.
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
@@ -130,10 +115,10 @@ celery -A app.celery_app worker --loglevel=info --pool=solo   # --pool=solo is W
 celery -A app.celery_app beat --loglevel=info
 ```
 
-API docs at `http://localhost:8000/docs` (disabled automatically when
+API docs at `http://localhost:8000/docs` (auto-disabled when
 `ENVIRONMENT=production`).
 
-## Frontend setup
+**Frontend:**
 
 ```bash
 cd frontend
@@ -146,16 +131,12 @@ App at `http://localhost:5173`.
 
 ## Everyday startup (after a reboot / Docker stops)
 
-Once everything's already set up once (venv created, `pnpm install` done,
-`.env` filled in), restarting after the machine slept or Docker Desktop
-quit is just: get Docker's containers back up, then the three long-running
-processes. Four separate terminals (or four background jobs):
+Once everything's set up once, restarting after the machine slept or Docker
+Desktop quit is just: get the containers back up, then the three
+long-running processes.
 
 ```bash
-# 1. Postgres + Redis (Docker Desktop must be running first -- start it
-#    from the Start menu if `docker ps` errors with "cannot connect to
-#    the Docker daemon"). These containers already exist from the first
-#    setup, so `docker start` (not `docker run`) is all that's needed:
+# 1. Postgres + Redis (start Docker Desktop first if `docker ps` errors)
 docker start skillswap-postgres skillswap-redis
 
 # 2. Backend API (from backend/, venv activated)
@@ -169,11 +150,16 @@ celery -A app.celery_app beat --loglevel=info
 pnpm dev
 ```
 
-Sanity check it's all actually up: `http://localhost:8000/docs` loads and
-`http://localhost:5173` loads. A frontend error like "Failed to fetch" on
-any form almost always means step 1 or 2 didn't happen (Docker not
-running yet is the most common cause) -- check those first before
-assuming it's a code bug.
+Sanity check: `http://localhost:8000/docs` and `http://localhost:5173`
+both load. A frontend "Failed to fetch" on any form almost always means
+step 1 or 2 hasn't happened yet — check those before assuming it's a code
+bug.
+
+## Deployment
+
+Frontend → Netlify (`netlify.toml`), backend → Render (`render.yaml`).
+Netlify/Vercel can't host the backend itself — see **DEPLOYMENT.md** for
+why, and the full walkthrough.
 
 ## Repo layout
 
@@ -182,17 +168,20 @@ backend/
   app/
     core/        settings, security (JWT/password/OTP), rate limiter, OAuth client
     db/          SQLAlchemy engine/session, declarative Base
-    models/      one module per schema entity (see the spec's Database Schema)
+    models/      one module per schema entity
     schemas/     Pydantic request/response models
-    api/routes/  FastAPI routers
-    services/    business logic (auth, credits, ...) kept out of route handlers
-    ws/          hand-rolled ConnectionManager (WebSocket rooms)
-    tasks/       Celery tasks (email sends, credit-escrow sweep)
+    api/routes/  FastAPI routers (REST + WebSocket)
+    services/    business logic kept out of route handlers (credits, booking,
+                 matching, badges, attendance, analytics, ...)
+    ws/          hand-rolled ConnectionManager (shared by chat/video/notifications)
+    tasks/       Celery tasks (email, credit-escrow sweep, waitlist sweep)
   alembic/       migrations (hand-written to match models/ exactly)
 frontend/
   src/
     api/         fetch wrapper with access-token injection + refresh rotation
-    context/     Auth + Theme (dark mode) React contexts
+    context/     Auth, Theme, Sidebar, Notifications, Call React contexts
+    crypto/      E2E chat encryption (ECDH + AES-GCM)
     pages/       one file per route
+    components/  shared UI (nav, video room, modals, ...)
     styles/      design tokens (tokens.css) + global styles
 ```

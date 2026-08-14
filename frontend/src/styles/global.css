@@ -149,6 +149,7 @@ select:focus-visible,
    get out of sync with the stylesheet. */
 :root {
   --sidebar-width: 240px;
+  --sidebar-width-collapsed: 72px;
 }
 .app-sidebar { display: none; }
 @media (min-width: 860px) {
@@ -169,6 +170,65 @@ select:focus-visible,
     border-right: 1px solid var(--border);
     z-index: 50;
     gap: var(--space-1);
+    /* No width transition on purpose: labels reappear on :hover the
+       instant the box widens (a `display` toggle, not animatable), so
+       animating the width separately meant the text popped back in
+       before the box had actually finished growing to fit it -- it
+       spilled out over whatever was underneath for the ~150ms in
+       between. Snapping both at once avoids that window entirely.
+       overflow: hidden is still here as a second line of defense. */
+    overflow: hidden;
+  }
+  /* Icons-only on the Messages route (see AppSidebar.jsx's `collapsed`)
+     -- that page already has its own two columns, a full labeled
+     sidebar alongside those was one bar too many. Labels/logout/profile
+     text stay in the DOM (see AppSidebar.jsx's `.sidebar-label` spans)
+     and are just hidden here, purely with CSS, so :hover below can bring
+     them back with no re-render and no layout jump elsewhere in the app
+     -- the content area's margin (App.jsx's `sidebar-collapsed` class)
+     stays put at the narrow width the whole time; hovering only makes
+     the (already `position: fixed`) rail itself widen and float over
+     the content, it never pushes anything. */
+  .app-sidebar.collapsed {
+    width: var(--sidebar-width-collapsed);
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+    align-items: center;
+  }
+  .app-sidebar.collapsed .app-sidebar-link,
+  .app-sidebar.collapsed .app-sidebar-logo {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+    width: 100%;
+    justify-content: center;
+  }
+  .app-sidebar.collapsed .sidebar-label { display: none; }
+  .app-sidebar.collapsed .unread-badge.sidebar-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+  }
+  .app-sidebar.collapsed .app-sidebar-profile { justify-content: center; }
+  .app-sidebar.collapsed .app-sidebar-profile-link { justify-content: center; }
+
+  /* Hovering a collapsed rail widens it back to full size and shows
+     everything again -- box-shadow instead of the resting border-right
+     so it visibly reads as "floating over the page" while expanded. */
+  .app-sidebar.collapsed:hover {
+    width: var(--sidebar-width);
+    box-shadow: var(--shadow-hover);
+  }
+  .app-sidebar.collapsed:hover .app-sidebar-link,
+  .app-sidebar.collapsed:hover .app-sidebar-logo {
+    justify-content: flex-start;
+  }
+  .app-sidebar.collapsed:hover .sidebar-label { display: revert; }
+  .app-sidebar.collapsed:hover .unread-badge.sidebar-badge {
+    position: static;
+  }
+  .app-sidebar.collapsed:hover .app-sidebar-profile,
+  .app-sidebar.collapsed:hover .app-sidebar-profile-link {
+    justify-content: flex-start;
   }
 }
 .app-sidebar-logo {
@@ -306,7 +366,15 @@ select:focus-visible,
    the sidebar on desktop (no toggle -- this shell is always present). */
 .app-shell.authed { padding-bottom: 72px; }
 @media (min-width: 860px) {
-  .app-shell.authed { margin-left: var(--sidebar-width); padding-bottom: 0; }
+  .app-shell.authed { margin-left: var(--sidebar-width); padding-bottom: 0; transition: margin-left 0.15s ease; }
+  .app-shell.authed.sidebar-collapsed { margin-left: var(--sidebar-width-collapsed); }
+  /* Hovering the collapsed rail should push the content aside, not float
+     over it and cover it up -- :has() lets the content area (a sibling
+     of .app-sidebar, not a descendant, so plain CSS combinators can't
+     reach it) react to the sidebar's own :hover state with no JS. */
+  body:has(.app-sidebar.collapsed:hover) .app-shell.authed.sidebar-collapsed {
+    margin-left: var(--sidebar-width);
+  }
 }
 
 /* Home page: main content + a right-hand rail (credits/stats), instead

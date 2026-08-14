@@ -42,12 +42,18 @@ function RootRoute() {
 function AppRoot({ children }) {
   const { user, loading } = useAuth();
   const { open } = useSidebar();
+  const { pathname } = useLocation();
+  // Kept in sync with AppSidebar.jsx's own `collapsed` check -- the
+  // sidebar shrinks to icons-only on Messages (two columns of its own
+  // already), so the content area's reserved margin needs to shrink
+  // with it instead of leaving a gap where the full-width rail used to be.
+  const sidebarCollapsed = pathname.startsWith("/messages");
 
   if (user && !loading) {
     return (
       <>
         <AppSidebar />
-        <div className="app-shell authed">{children}</div>
+        <div className={`app-shell authed${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>{children}</div>
         <MessageToast />
         <PersistentCallOverlay />
       </>

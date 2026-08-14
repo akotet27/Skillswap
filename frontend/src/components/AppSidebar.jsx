@@ -31,6 +31,16 @@ export default function AppSidebar() {
   const { unreadTotal, pendingRequestsTotal } = useNotifications();
   const navItems = user.is_admin ? [...NAV_ITEMS, { label: "Admin", to: "/admin", icon: ShieldCheck }] : NAV_ITEMS;
   const badgeCounts = { Messages: unreadTotal, Requests: pendingRequestsTotal };
+  // The split-view Messages layout already has its own two columns (see
+  // MessagesLayout.jsx) -- a full-width labeled sidebar next to those
+  // made for three competing vertical bars on screen at once. Icons-only
+  // by default there, and the content area's margin matches that width
+  // permanently (see App.jsx's `sidebar-collapsed` class) -- but you can
+  // still get at labels/logout/etc by hovering the rail (pure CSS, see
+  // `.app-sidebar.collapsed:hover` in global.css): it widens and floats
+  // *over* the content instead of pushing it, so the message panes never
+  // jump around while you're just mousing past the nav.
+  const collapsed = pathname.startsWith("/messages");
 
   useEffect(() => {
     apiJson("/api/credits/me").then((c) => setCredits(c.balance)).catch(() => {});
@@ -47,42 +57,60 @@ export default function AppSidebar() {
 
   return (
     <>
-      {/* Wide viewports: a real sticky sidebar */}
-      <aside className="app-sidebar">
-        <Link to="/home" className="app-sidebar-logo">
+      {/* Wide viewports: a real sticky sidebar. Labels/text are always in
+          the markup -- .collapsed hides them with CSS (not a JS
+          conditional), specifically so :hover can bring them back
+          without a re-render, see global.css. */}
+      <aside className={`app-sidebar${collapsed ? " collapsed" : ""}`}>
+        <Link to="/home" className="app-sidebar-logo" title="SkillSwap">
           <img src="/logo-icon.png" alt="" width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} />
-          <span>SkillSwap</span>
+          <span className="sidebar-label">SkillSwap</span>
         </Link>
 
         <nav style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", flex: 1 }}>
           {navItems.map(({ label, to, icon: Icon }) => {
             const count = badgeCounts[label] || 0;
             return (
-              <Link key={to} to={to} className={`app-sidebar-link${pathname === to ? " active" : ""}`} style={{ justifyContent: "space-between" }}>
+              <Link
+                key={to}
+                to={to}
+                className={`app-sidebar-link${pathname === to ? " active" : ""}`}
+                style={{ justifyContent: "space-between", position: "relative" }}
+                title={label}
+                aria-label={label}
+              >
                 <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                  <Icon size={18} />
-                  {label}
+                  <Icon size={18} style={{ flexShrink: 0 }} />
+                  <span className="sidebar-label">{label}</span>
                 </span>
-                {count > 0 && <span className="unread-badge">{count > 99 ? "99+" : count}</span>}
+                {count > 0 && (
+                  <span className="unread-badge sidebar-badge">{count > 99 ? "99+" : count}</span>
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <button type="button" className="app-sidebar-link" onClick={toggle} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", font: "inherit" }}>
-          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          {theme === "dark" ? "Light mode" : "Dark mode"}
+        <button
+          type="button"
+          className="app-sidebar-link"
+          onClick={toggle}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+          style={{ border: "none", background: "none", cursor: "pointer", width: "100%", font: "inherit", justifyContent: "flex-start" }}
+        >
+          {theme === "dark" ? <Sun size={18} style={{ flexShrink: 0 }} /> : <Moon size={18} style={{ flexShrink: 0 }} />}
+          <span className="sidebar-label">{theme === "dark" ? "Light mode" : "Dark mode"}</span>
         </button>
 
         <div className="app-sidebar-profile">
-          <Link to="/profile" className="app-sidebar-profile-link">
-            <img src={avatarUrl} alt="" width={36} height={36} style={{ borderRadius: "999px", objectFit: "cover", border: "1px solid var(--border)" }} />
-            <div style={{ minWidth: 0 }}>
+          <Link to="/profile" className="app-sidebar-profile-link" title={user.name}>
+            <img src={avatarUrl} alt="" width={36} height={36} style={{ borderRadius: "999px", objectFit: "cover", border: "1px solid var(--border)", flexShrink: 0 }} />
+            <div className="sidebar-label" style={{ minWidth: 0 }}>
               <strong style={{ display: "block", fontSize: "var(--text-body-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</strong>
               <span className="field-hint">{credits === null ? "…" : `${formatCredits(credits)} credit${credits === 1 ? "" : "s"}`}</span>
             </div>
           </Link>
-          <button type="button" onClick={onLogout} aria-label="Log out" className="app-sidebar-logout">
+          <button type="button" onClick={onLogout} aria-label="Log out" className="app-sidebar-logout sidebar-label">
             <LogOut size={16} />
           </button>
         </div>

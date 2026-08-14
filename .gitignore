@@ -12,6 +12,14 @@ backend/*.sqlite3
 # --- Alembic ---
 # (versions are tracked; local sqlite artifacts are not)
 
+# --- Celery Beat ---
+# Regenerated every time `celery beat` runs -- local scheduler state, not
+# source. Was accidentally committed once; don't let it happen again.
+backend/celerybeat-schedule*
+
+# --- Stray dev/requirements drafts ---
+backend/_req_unpinned.txt
+
 # --- Node / frontend ---
 node_modules/
 frontend/dist/

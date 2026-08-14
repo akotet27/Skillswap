@@ -1,0 +1,170 @@
+# Render Blueprint -- https://render.com/docs/blueprint-spec
+#
+# Provisions the three long-running processes SkillSwap's backend actually
+# needs (a real web service for FastAPI + WebSockets, plus two worker
+# processes for Celery) and a managed Postgres database. This is why the
+# backend can't live on Netlify/Vercel: those only run short-lived
+# serverless functions, and SkillSwap depends on persistent WebSocket
+# connections (chat/video signaling/presence) and a continuously-running
+# Celery worker + beat scheduler (email sends, the hourly credit-escrow
+# sweep, the daily skill-waitlist sweep) -- none of which a serverless
+# function can do.
+#
+# Redis is deliberately NOT provisioned here -- Render's managed Redis
+# blueprint syntax has changed over time and this file would risk going
+# stale silently. Create it once by hand in the Render dashboard (New +
+# -> Redis, a couple of clicks) and paste its connection string into the
+# REDIS_URL / CELERY_BROKER_URL / CELERY_RESULT_BACKEND env vars below
+# (marked `sync: false`, i.e. set manually in the dashboard, not tracked
+# in this file). See DEPLOYMENT.md for the full walkthrough.
+
+services:
+  # --- FastAPI + Uvicorn, serving both the REST API and the WebSocket
+  # endpoints (chat, video signaling, presence, notifications). Runs the
+  # Alembic migration as part of the start command so the schema is
+  # always current before the server actually starts accepting traffic. ---
+  - type: web
+    name: skillswap-api
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skillswap-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        sync: false # your Netlify URL, e.g. https://skillswap.netlify.app
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false # https://<this-service>.onrender.com/api/auth/google/callback
+      - key: EMAIL_BACKEND
+        value: console # flip to "smtp" once MAIL_* below are filled in for real
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: SkillSwap
+      - key: MAIL_SERVER
+        sync: false
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_STARTTLS
+        value: "true"
+      - key: MAIL_SSL_TLS
+        value: "false"
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
+      - key: OTP_LENGTH
+        value: "6"
+      - key: OTP_EXPIRE_MINUTES
+        value: "5"
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: MAX_UPLOAD_MB
+        value: "10"
+
+  # --- Celery worker: everything queued via .delay()/.apply_async() --
+  # OTP/reset/reminder emails, badge awarding, waitlist notifications. ---
+  - type: worker
+    name: skillswap-worker
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery_app worker --loglevel=info
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skillswap-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false # same value as skillswap-api's -- copy it over after that service's first deploy
+      - key: EMAIL_BACKEND
+        value: console
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: SkillSwap
+      - key: MAIL_SERVER
+        sync: false
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_STARTTLS
+        value: "true"
+      - key: MAIL_SSL_TLS
+        value: "false"
+
+  # --- Celery beat: fires the hourly escrow-release sweep and the daily
+  # skill-waitlist sweep on schedule (see app/celery_app.py's beat_schedule).
+  # A separate process from the worker on purpose -- beat only schedules
+  # tasks, it doesn't execute them; the worker above does the actual work. ---
+  - type: worker
+    name: skillswap-beat
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery_app beat --loglevel=info
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skillswap-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+
+databases:
+  - name: skillswap-db
+    plan: free
+    databaseName: skillswap
+    user: skillswap

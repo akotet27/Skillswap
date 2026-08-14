@@ -1,0 +1,24 @@
+# Netlify build config for the frontend only -- the backend can't live on
+# Netlify (or Vercel): both are serverless-function hosts, and SkillSwap's
+# backend needs a genuinely long-running process for WebSockets (chat,
+# video signaling, presence) and Celery workers. See render.yaml +
+# DEPLOYMENT.md for where the backend actually goes.
+
+[build]
+  base = "frontend"
+  command = "pnpm install && pnpm run build"
+  publish = "frontend/dist"
+
+# Client-side routing (react-router's BrowserRouter) -- every path has to
+# resolve to index.html so a hard refresh on e.g. /sessions doesn't 404,
+# with the actual route handled in the browser afterward.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# VITE_API_BASE_URL / VITE_WS_BASE_URL are set in the Netlify dashboard
+# (Site configuration -> Environment variables), not here -- they point at
+# wherever the Render backend ends up (e.g. https://skillswap-api.onrender.com
+# and wss://skillswap-api.onrender.com). Vite only bakes in vars prefixed
+# VITE_ at build time, so these must be set *before* triggering a deploy.
