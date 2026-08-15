@@ -14,7 +14,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.api.routes import admin, auth, chat_ws, conversations, credits, matches, sessions, signaling_ws, skills, swap_requests, users, video
+from app.api.routes import admin, auth, chat_ws, conversations, credits, internal, matches, sessions, signaling_ws, skills, swap_requests, users, video
 from app.core.config import settings
 from app.core.limiter import limiter
 
@@ -61,6 +61,7 @@ app.include_router(conversations.router)
 app.include_router(chat_ws.router)
 app.include_router(video.router)
 app.include_router(signaling_ws.router)
+app.include_router(internal.router)
 
 
 @app.get("/api/health", tags=["meta"])

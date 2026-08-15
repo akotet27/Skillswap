@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select, or_
 from sqlalchemy.orm import Session as DbSession
 
+from app.core.config import settings
 from app.core.deps import get_current_user
 from app.core.limiter import limiter
 from app.db.session import get_db
@@ -208,12 +209,21 @@ def _dispatch_booking_emails(db: DbSession, swap: SwapRequest, session) -> None:
     # session -- not the hourly Beat schedule (that's only the credit
     # escrow sweep, see app/celery_app.py). `eta` tells Celery to hold the
     # task until that wall-clock time rather than running it immediately.
-    reminder_time = session.scheduled_start_utc - REMINDER_LEAD_TIME
-    send_session_reminder_email.apply_async(
-        args=[learner.email, teacher.name, when_iso,
-              ics_content], eta=reminder_time
-    )
-    send_session_reminder_email.apply_async(
-        args=[teacher.email, learner.name, when_iso,
-              ics_content], eta=reminder_time
-    )
+    #
+    # Skipped entirely under CELERY_TASK_ALWAYS_EAGER (the free-tier deploy
+    # path with no separate worker, see DEPLOYMENT.md): eager mode executes
+    # a task the instant it's queued, so `eta` can't be honored -- there's
+    # no scheduler around to hold onto it until reminder_time. Silently
+    # firing the reminder immediately (often hours or days before the
+    # session) would be worse than not sending it, so this is a known,
+    # documented gap on that path rather than a bug.
+    if not settings.CELERY_TASK_ALWAYS_EAGER:
+        reminder_time = session.scheduled_start_utc - REMINDER_LEAD_TIME
+        send_session_reminder_email.apply_async(
+            args=[learner.email, teacher.name, when_iso,
+                  ics_content], eta=reminder_time
+        )
+        send_session_reminder_email.apply_async(
+            args=[teacher.email, learner.name, when_iso,
+                  ics_content], eta=reminder_time
+        )

@@ -161,6 +161,18 @@ Frontend → Netlify (`netlify.toml`), backend → Render (`render.yaml`).
 Netlify/Vercel can't host the backend itself — see **DEPLOYMENT.md** for
 why, and the full walkthrough.
 
+The default deploy path is fully free: Render has no free tier for
+background workers, so `render.yaml` skips paying for one and instead runs
+Celery tasks synchronously in the API process (`CELERY_TASK_ALWAYS_EAGER`),
+with a free GitHub Actions cron (`.github/workflows/scheduled-sweeps.yml`)
+standing in for Celery Beat's hourly/daily sweeps. The one feature that
+doesn't work on this path is session-reminder emails (they rely on
+scheduling a task for a specific future time, which eager execution can't
+honor) — everything else, including OTP emails, badge awarding, and the
+credit-escrow release, works the same as it does locally with a real
+worker. DEPLOYMENT.md also documents the paid alternative (~$7/mo for a
+real worker+beat process) if you want that feature back.
+
 ## Repo layout
 
 ```

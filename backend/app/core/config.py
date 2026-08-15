@@ -69,6 +69,21 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_MB: int = 10
 
+    # Free-tier deploy path (see DEPLOYMENT.md) -- lets the whole app run
+    # without a separate Celery worker process. When true, .delay()/
+    # .apply_async() calls execute synchronously in the same process
+    # instead of being queued to a broker/worker. Leave false for local dev
+    # (run a real `celery worker` as documented in README.md) and for any
+    # deploy that does pay for a real skillswap-worker service.
+    CELERY_TASK_ALWAYS_EAGER: bool = False
+
+    # Shared secret an external scheduler (see
+    # .github/workflows/scheduled-sweeps.yml) must present to trigger the
+    # periodic sweeps Celery Beat would otherwise run on its own schedule.
+    # Only relevant when CELERY_TASK_ALWAYS_EAGER is true -- there's no
+    # separate beat process to fire these on a schedule by itself.
+    INTERNAL_SWEEP_SECRET: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"

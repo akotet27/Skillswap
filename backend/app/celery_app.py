@@ -30,6 +30,17 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
+    # See CELERY_TASK_ALWAYS_EAGER in core/config.py -- lets the app run
+    # with no separate worker process by executing .delay()/.apply_async()
+    # calls synchronously, in-process, the moment they're queued. Off by
+    # default (local dev and any deploy running a real worker+beat process
+    # leave this alone). One real limitation: `eta=`/`countdown=` scheduling
+    # (used for session-reminder emails, see swap_requests.py) can't be
+    # honored in eager mode -- there's no scheduler holding the task until
+    # that future time, so callers must guard those specifically rather
+    # than relying on this flag to handle it for them.
+    task_always_eager=settings.CELERY_TASK_ALWAYS_EAGER,
+    task_eager_propagates=settings.CELERY_TASK_ALWAYS_EAGER,
 )
 
 # Beat schedule: the escrow-release sweep runs hourly, per the spec
