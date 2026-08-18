@@ -1022,8 +1022,13 @@ a.stat-list-row:hover { background: var(--border); }
   border-color: var(--border);
   cursor: pointer;
 }
-.date-picker-cell:not(:disabled):hover { background: var(--surface-alt); }
+/* :not(.selected) here matters -- :hover's extra pseudo-class otherwise
+   outranks .selected's specificity and wins on `background` the moment
+   you hover the cell you just clicked, leaving white text stranded on
+   the light hover tint underneath it (invisible). */
+.date-picker-cell:not(:disabled):not(.selected):hover { background: var(--surface-alt); }
 .date-picker-cell.selected { background: var(--color-midnight); color: #fff; border-color: var(--color-midnight); }
+.date-picker-cell.selected:hover { background: var(--color-midnight); }
 :root[data-theme="dark"] .date-picker-cell.selected { background: #fff; color: var(--color-midnight); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .date-picker-cell.selected { background: #fff; color: var(--color-midnight); }

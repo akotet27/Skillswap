@@ -52,6 +52,20 @@ export default function ConversationList({ activeId }) {
     apiJson("/api/conversations").then(setConversations).catch((e) => setError(e.message));
   }, []);
 
+  // ChatPage marks a conversation read on the backend the moment it opens
+  // (see its own effect keyed on conversationId), but this list is only
+  // ever fetched once above and MessagesLayout never unmounts it between
+  // conversations -- without this, the badge here would keep showing the
+  // stale unread_count from before you opened it until a full page
+  // reload. Mirroring that same "opening it reads it" fact locally here
+  // avoids a network round trip just to zero out a number we already know.
+  useEffect(() => {
+    if (!activeId) return;
+    setConversations((prev) =>
+      prev?.map((c) => (String(c.id) === String(activeId) ? { ...c, unread_count: 0 } : c)) ?? prev
+    );
+  }, [activeId]);
+
   const presence = usePresence(conversations?.map((c) => c.other_user.id));
 
   const visible = useMemo(() => {
