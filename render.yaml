@@ -78,23 +78,16 @@ services:
       - key: GOOGLE_REDIRECT_URI
         sync: false # https://<this-service>.onrender.com/api/auth/google/callback
       - key: EMAIL_BACKEND
-        value: console # flip to "smtp" once MAIL_* below are filled in for real
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
-        sync: false
+        value: console # flip to "resend" once RESEND_API_KEY below is filled in for real
+      - key: RESEND_API_KEY
+        sync: false # api.resend.com dashboard -> API Keys. Use "resend", not "smtp" --
+                     # Render's free web service blocks outbound SMTP entirely (confirmed
+                     # live: TimeoutError connecting to smtp.resend.com:587), but HTTPS
+                     # (what the "resend" backend actually uses) is never blocked.
       - key: MAIL_FROM
-        sync: false
+        sync: false # only read by the "resend" backend for the From: header, e.g. onboarding@resend.dev
       - key: MAIL_FROM_NAME
         value: SkillSwap
-      - key: MAIL_SERVER
-        sync: false
-      - key: MAIL_PORT
-        value: "587"
-      - key: MAIL_STARTTLS
-        value: "true"
-      - key: MAIL_SSL_TLS
-        value: "false"
       - key: TURN_URL
         sync: false
       - key: TURN_USERNAME
@@ -143,22 +136,13 @@ services:
 #         sync: false # same value as skillswap-api's
 #       - key: EMAIL_BACKEND
 #         value: console
-#       - key: MAIL_USERNAME
-#         sync: false
-#       - key: MAIL_PASSWORD
-#         sync: false
+#       - key: RESEND_API_KEY
+#         sync: false # the SMTP block below is Render-wide, not free-tier-specific --
+#                      # "resend" (HTTPS) is still the right choice even on a paid worker
 #       - key: MAIL_FROM
 #         sync: false
 #       - key: MAIL_FROM_NAME
 #         value: SkillSwap
-#       - key: MAIL_SERVER
-#         sync: false
-#       - key: MAIL_PORT
-#         value: "587"
-#       - key: MAIL_STARTTLS
-#         value: "true"
-#       - key: MAIL_SSL_TLS
-#         value: "false"
 
 databases:
   - name: skillswap-db

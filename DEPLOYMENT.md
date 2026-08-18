@@ -84,9 +84,8 @@ immediately at booking time regardless, are unaffected.
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` —
      only if Google OAuth login is enabled; redirect URI is
      `https://<skillswap-api-service>.onrender.com/api/auth/google/callback`.
-   - `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` / `MAIL_SERVER` — only
-     needed once you flip `EMAIL_BACKEND` from `console` to `smtp` (see
-     below).
+   - `RESEND_API_KEY` / `MAIL_FROM` — only needed once you flip
+     `EMAIL_BACKEND` from `console` to `resend` (see below).
    - `TURN_URL` / `TURN_USERNAME` / `TURN_CREDENTIAL` — a TURN server for
      WebRTC. Calls between peers on friendly networks work without one via
      STUN, but anyone behind a symmetric NAT/strict firewall won't connect
@@ -124,9 +123,28 @@ from the Actions tab) to restart them.
 **Email in production:** `render.yaml` ships `EMAIL_BACKEND=console` by
 default, meaning OTP/reminder/notification emails are written to the
 service's logs instead of actually sent — same "no real email in dev"
-default the local backend uses. Flip it to `EMAIL_BACKEND=smtp` (and fill
-in the `MAIL_*` vars) once you have real SMTP credentials, or nobody will
-receive their signup OTP.
+default the local backend uses.
+
+Flip it to **`EMAIL_BACKEND=resend`**, not `smtp` — Render's free web
+service blocks outbound SMTP entirely (confirmed live: connecting to
+`smtp.resend.com:587` fails with `TimeoutError: [Errno 110] Connection
+timed out`, every time, regardless of how correct the credentials are).
+The `resend` backend sends the exact same emails over Resend's HTTPS API
+instead of raw SMTP, which is never blocked. To set it up:
+
+1. Sign up free at [resend.com](https://resend.com), using whichever
+   email address you want to receive test sends at.
+2. **API Keys** → **Create API Key** → copy it.
+3. On `skillswap-api`: set `EMAIL_BACKEND=resend`, `RESEND_API_KEY` to the
+   key you just copied, and `MAIL_FROM=onboarding@resend.dev` (Resend's
+   shared testing sender — no domain ownership/verification needed).
+4. Redeploy.
+
+**Caveat:** without your own verified domain on Resend, sandbox mode can
+only deliver to the email address you signed up to Resend with — real
+users/friends won't receive anything yet. To open that up, verify a real
+domain you own under Resend's **Domains** tab (DNS records they provide)
+and switch `MAIL_FROM` to an address on that domain instead.
 
 **File uploads (read before relying on this in production):** Render's
 free web services use ephemeral local disk — anything written to
@@ -173,7 +191,7 @@ avoid confusing yourself later.
 ## 3. Smoke-test the deployed pair
 
 - Sign up a new account → check the Render logs for the OTP (if still on
-  `EMAIL_BACKEND=console`) or your inbox (if on `smtp`).
+  `EMAIL_BACKEND=console`) or your inbox (if on `resend`).
 - Start a video call between two browser tabs/devices to confirm WebRTC
   signaling reaches the deployed `skillswap-api` over `wss://`.
 - Send a chat message both ways to confirm the E2E key exchange completes

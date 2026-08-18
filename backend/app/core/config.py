@@ -41,8 +41,13 @@ class Settings(BaseSettings):
 
     # Email
     # "console" (default) logs the email instead of sending it -- safe for
-    # local dev/testing, never hits a real SMTP server. Set EMAIL_BACKEND=
-    # smtp explicitly to actually send mail (e.g. in a deployed environment).
+    # local dev/testing, never hits a real SMTP server. "smtp" actually
+    # sends via the MAIL_* settings below -- works locally and on hosts
+    # that allow outbound SMTP. "resend" sends via Resend's HTTPS API
+    # instead of raw SMTP -- needed on hosts (e.g. Render's free web
+    # service tier) that block outbound SMTP ports entirely; HTTPS is
+    # never blocked since the app already makes outbound HTTPS calls
+    # elsewhere (Google OAuth). Requires RESEND_API_KEY below.
     EMAIL_BACKEND: str = "console"
     MAIL_USERNAME: str = ""
     MAIL_PASSWORD: str = ""
@@ -52,6 +57,7 @@ class Settings(BaseSettings):
     MAIL_PORT: int = 587
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
+    RESEND_API_KEY: str = ""
 
     # TURN / STUN
     STUN_URL: str = "stun:stun.l.google.com:19302"
