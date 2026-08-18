@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiJson } from "../api/client";
-import { DAY_NAMES, nextDateForDayOfWeek, zonedTimeToUtc } from "../utils/timezone";
+import { DAY_NAMES, zonedTimeToUtc } from "../utils/timezone";
+import WeekdayDatePicker from "../components/WeekdayDatePicker";
 
 export default function BookingPage() {
   const { userId } = useParams();
@@ -14,7 +15,7 @@ export default function BookingPage() {
   const [error, setError] = useState("");
 
   const [selectedBlockIdx, setSelectedBlockIdx] = useState(null);
-  const [weeksAhead, setWeeksAhead] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [skillLearnedId, setSkillLearnedId] = useState("");
   const [skillTaughtId, setSkillTaughtId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -54,9 +55,8 @@ export default function BookingPage() {
     e.preventDefault();
     setError("");
     const block = availability[selectedBlockIdx];
-    const dateStr = nextDateForDayOfWeek(block.day_of_week, weeksAhead);
-    const start = zonedTimeToUtc(dateStr, block.start_time.slice(0, 5), block.timezone);
-    const end = zonedTimeToUtc(dateStr, block.end_time.slice(0, 5), block.timezone);
+    const start = zonedTimeToUtc(selectedDate, block.start_time.slice(0, 5), block.timezone);
+    const end = zonedTimeToUtc(selectedDate, block.end_time.slice(0, 5), block.timezone);
 
     setSubmitting(true);
     try {
@@ -119,7 +119,15 @@ export default function BookingPage() {
 
           <div className="field">
             <label htmlFor="block">{target.name}'s available time blocks</label>
-            <select id="block" required value={selectedBlockIdx ?? ""} onChange={(e) => setSelectedBlockIdx(e.target.value)}>
+            <select
+              id="block"
+              required
+              value={selectedBlockIdx ?? ""}
+              onChange={(e) => {
+                setSelectedBlockIdx(e.target.value);
+                setSelectedDate(null); // the calendar below depends on the block's weekday -- start fresh
+              }}
+            >
               <option value="">Choose a time…</option>
               {availability.map((b, i) => (
                 <option key={i} value={i}>
@@ -130,18 +138,23 @@ export default function BookingPage() {
             {availability.length === 0 && <span className="field-hint">{target.name} hasn't set any availability yet.</span>}
           </div>
 
-          <div className="field">
-            <label htmlFor="weeks">Which occurrence</label>
-            <select id="weeks" value={weeksAhead} onChange={(e) => setWeeksAhead(Number(e.target.value))}>
-              <option value={0}>This coming week</option>
-              <option value={1}>The week after</option>
-              <option value={2}>In two weeks</option>
-            </select>
-          </div>
+          {selectedBlockIdx !== null && (
+            <div className="field">
+              <label>Pick a date</label>
+              <span className="field-hint">
+                Only {DAY_NAMES[availability[selectedBlockIdx].day_of_week]}s are shown — that's the day this time block repeats on.
+              </span>
+              <WeekdayDatePicker
+                dayOfWeek={availability[selectedBlockIdx].day_of_week}
+                selectedDate={selectedDate}
+                onSelect={setSelectedDate}
+              />
+            </div>
+          )}
 
           {error && <div className="error-banner">{error}</div>}
 
-          <button className="btn btn-primary btn-block" disabled={submitting || selectedBlockIdx === null}>
+          <button className="btn btn-primary btn-block" disabled={submitting || selectedBlockIdx === null || !selectedDate}>
             {submitting ? "Sending request…" : "Send swap request"}
           </button>
         </form>

@@ -960,6 +960,75 @@ a.stat-list-row:hover { background: var(--border); }
   100% { opacity: 0; transform: translateY(-180px) scale(1.1); }
 }
 
+/* Weekday-constrained calendar (WeekdayDatePicker.jsx) -- picking a
+   specific occurrence of a recurring weekly availability block. Grid
+   columns are a fixed 7 (one per weekday) at any width; the cells
+   themselves shrink via aspect-ratio so the whole thing scales down
+   cleanly inside a narrow mobile card instead of overflowing it. */
+.date-picker { margin-top: var(--space-2); }
+.date-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+.date-picker-month { font-weight: 600; color: var(--text-heading); font-size: var(--text-body-sm); }
+.date-picker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-heading);
+  cursor: pointer;
+}
+.date-picker-nav:hover:not(:disabled) { background: var(--surface-alt); }
+.date-picker-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+.date-picker-weekdays,
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.date-picker-weekdays {
+  margin-bottom: var(--space-1);
+  text-align: center;
+  font-size: var(--text-eyebrow);
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+.date-picker-cell {
+  aspect-ratio: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--space-2);
+  background: none;
+  color: var(--text-disabled);
+  font: inherit;
+  font-size: var(--text-body-sm);
+  cursor: not-allowed;
+}
+/* Only dates matching the chosen block's weekday are ever enabled --
+   :not(:disabled) is the actual "this is a real option" signal here. */
+.date-picker-cell:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border);
+  cursor: pointer;
+}
+.date-picker-cell:not(:disabled):hover { background: var(--surface-alt); }
+.date-picker-cell.selected { background: var(--color-midnight); color: #fff; border-color: var(--color-midnight); }
+:root[data-theme="dark"] .date-picker-cell.selected { background: #fff; color: var(--color-midnight); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .date-picker-cell.selected { background: #fff; color: var(--color-midnight); }
+}
+
 /* Responsive: mobile-first, tested down to ~360px */
 @media (max-width: 480px) {
   .container { padding: 0 var(--space-4); }

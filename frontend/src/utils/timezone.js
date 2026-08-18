@@ -17,16 +17,4 @@ export function zonedTimeToUtc(dateStr, timeStr, timeZone) {
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-/** Next date (YYYY-MM-DD, in the *local browser* calendar) matching the
- * given ISO day-of-week (0=Monday..6=Sunday), `weeksAhead` weeks from now. */
-export function nextDateForDayOfWeek(dayOfWeek, weeksAhead = 0) {
-  const today = new Date();
-  const todayIso = (today.getDay() + 6) % 7; // JS getDay(): 0=Sunday -> convert to 0=Monday
-  let delta = (dayOfWeek - todayIso + 7) % 7;
-  if (delta === 0 && weeksAhead === 0) delta = 0; // allow booking later today
-  const target = new Date(today);
-  target.setDate(today.getDate() + delta + weeksAhead * 7);
-  return target.toISOString().slice(0, 10);
-}
-
 export { DAY_NAMES };
