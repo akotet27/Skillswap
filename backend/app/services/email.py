@@ -20,6 +20,18 @@ Backend is gated by EMAIL_BACKEND (see app/core/config.py):
     production). HTTPS is never blocked the same way, since the app
     already makes outbound HTTPS calls elsewhere (Google OAuth). Needs
     RESEND_API_KEY, not the MAIL_* SMTP settings.
+
+The actual network call (SMTP or Resend) is wrapped in a try/except that
+logs and swallows the error instead of raising. This matters specifically
+on the free-tier deploy path (CELERY_TASK_ALWAYS_EAGER=true, see
+app/celery_app.py): an email task there runs inline in the request that
+queued it, so an unhandled exception here would crash an unrelated
+user-facing action (signup, password reset, booking confirmation...) just
+because the email provider rejected or hiccuped -- e.g. Resend's sandbox
+mode (no verified domain) rejects any recipient other than the account's
+own signup address, which would otherwise 500 every signup for anyone but
+the developer. A failed send should degrade to "no email arrived", never
+"the request failed."
 """
 import base64
 import logging
@@ -62,12 +74,15 @@ def send_email(to: str, subject: str, html_body: str, attachments: list[tuple[st
         part.add_header("Content-Disposition", "attachment", filename=filename)
         msg.attach(part)
 
-    with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT) as server:
-        if settings.MAIL_STARTTLS:
-            server.starttls()
-        if settings.MAIL_USERNAME:
-            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-        server.sendmail(settings.MAIL_FROM, [to], msg.as_string())
+    try:
+        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT) as server:
+            if settings.MAIL_STARTTLS:
+                server.starttls()
+            if settings.MAIL_USERNAME:
+                server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+            server.sendmail(settings.MAIL_FROM, [to], msg.as_string())
+    except Exception:
+        logger.exception("Failed to send email via SMTP to=%s subject=%s", to, subject)
 
 
 def _send_via_resend_api(to: str, subject: str, html_body: str, attachments: list[tuple[str, bytes, str]] | None) -> None:
@@ -86,10 +101,17 @@ def _send_via_resend_api(to: str, subject: str, html_body: str, attachments: lis
             for filename, content, _subtype in attachments
         ]
 
-    response = httpx.post(
-        "https://api.resend.com/emails",
-        headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
-        json=payload,
-        timeout=10.0,
-    )
-    response.raise_for_status()
+    try:
+        response = httpx.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+            json=payload,
+            timeout=10.0,
+        )
+        response.raise_for_status()
+    except Exception:
+        # Swallowed on purpose -- see the module docstring. Most common
+        # cause in practice: Resend's sandbox mode (no verified domain)
+        # rejecting a recipient that isn't the account's own signup
+        # address, which returns a 4xx here.
+        logger.exception("Failed to send email via Resend API to=%s subject=%s", to, subject)
