@@ -71,6 +71,16 @@ class Settings(BaseSettings):
     OTP_LENGTH: int = 6
     OTP_EXPIRE_MINUTES: int = 5
 
+    # Dev/test convenience: this exact code, if set, is accepted in place
+    # of the real signup-OTP or 2FA code -- so testing signup/2FA doesn't
+    # require reading Render logs or a real inbox every time. Empty by
+    # default (disabled). Deliberately gated by `is_production` below too,
+    # not just "is this var set" -- a leftover env var should never be
+    # enough on its own to let real users skip verification in production
+    # (see app/core/security.py's is_test_bypass_code, the one place this
+    # is actually checked).
+    OTP_TEST_BYPASS_CODE: str = ""
+
     # Uploads
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_MB: int = 10

@@ -45,6 +45,22 @@ def verify_otp_code(raw: str, hashed: str) -> bool:
     return pwd_context.verify(raw.upper(), hashed)
 
 
+def is_test_bypass_code(raw: str) -> bool:
+    """True if `raw` matches the dev/test bypass code (OTP_TEST_BYPASS_CODE)
+    -- used by signup-OTP and 2FA verification as an *additional* way to
+    pass, alongside the real code, never instead of checking it. Two
+    conditions must both hold, not just "the var happens to be set": the
+    app must not be running in production, and the var must be non-empty.
+    Belt-and-suspenders on purpose -- this is exactly the kind of bypass
+    that becomes a real vulnerability if it ever leaks into production
+    (see the verify_pending_signup bug fixed earlier this same session)."""
+    return (
+        not settings.is_production
+        and bool(settings.OTP_TEST_BYPASS_CODE)
+        and raw.upper() == settings.OTP_TEST_BYPASS_CODE.upper()
+    )
+
+
 def generate_opaque_token() -> str:
     """Used for refresh tokens and password-reset links: a random secret
     the client holds, of which we only ever store a hash server-side."""
