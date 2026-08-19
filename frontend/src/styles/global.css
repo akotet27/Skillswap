@@ -862,6 +862,21 @@ a.stat-list-row:hover { background: var(--border); }
 }
 .browser-frame-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--color-mist); }
 
+/* VideoSessionShowcase.jsx's mock call preview: two 88px-avatar video
+   tiles plus a chat panel (min-width 170px) side by side. That combined
+   floor is wider than a narrow phone's available content width, and as
+   a plain non-wrapping flex row it was pushing the whole page a little
+   wider than the viewport instead of shrinking -- a small, easy-to-miss
+   overflow, but a page-wide one (shows up as a persistent gap on the
+   right of *every* section, not just this one). Wrapping at the point
+   where it'd otherwise get too tight lets the chat panel drop below the
+   video tiles instead. */
+.video-showcase-chat { min-width: 170px; }
+@media (max-width: 560px) {
+  .video-showcase-row { flex-wrap: wrap; }
+  .video-showcase-chat { min-width: 100%; }
+}
+
 /* Dark footer -- the one place on the homepage that goes full-dark
    regardless of the light/dark theme toggle, matching the mockup. */
 .site-footer { background: var(--color-midnight); color: #fff; padding: var(--space-16) 0 var(--space-8); }

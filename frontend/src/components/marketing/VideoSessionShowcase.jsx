@@ -28,7 +28,7 @@ export default function VideoSessionShowcase() {
         </span>
       </div>
 
-      <div style={{ display: "flex", background: "var(--color-midnight)", minHeight: 300 }}>
+      <div className="video-showcase-row" style={{ display: "flex", background: "var(--color-midnight)", minHeight: 300 }}>
         <div style={{ flex: 2, position: "relative", display: "flex" }}>
           {PARTICIPANTS.map((p) => (
             <div
@@ -70,7 +70,7 @@ export default function VideoSessionShowcase() {
           </div>
         </div>
 
-        <div style={{ flex: 1, minWidth: 170, background: "var(--surface)", display: "flex", flexDirection: "column" }}>
+        <div className="video-showcase-chat" style={{ flex: 1, background: "var(--surface)", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--border)" }}>
             <strong style={{ fontSize: "var(--text-body-sm)", color: "var(--text-heading)" }}>Chat</strong>
             <X size={14} style={{ color: "var(--text-tertiary)" }} />
