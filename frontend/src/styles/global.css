@@ -776,6 +776,23 @@ a.stat-list-row:hover { background: var(--border); }
   .hero-grid { grid-template-columns: 1fr; }
 }
 
+/* Was an inline `style={{ fontSize: "var(--text-display)" }}` on the <h1>
+   itself -- which meant the general "shrink h1 on small screens" rule
+   further down (@media max-width:480px) could never actually win, since
+   an inline style always beats a stylesheet rule no matter what media
+   query it's in. That's what was clipping "Learn from Peers." off the
+   edge of a phone screen: the heading stayed at the desktop 64px size no
+   matter how narrow the viewport got. A real class can be overridden
+   properly, and gets an extra step down at tablet width too, not just
+   one hard jump at 480px. */
+.hero-heading { font-size: var(--text-display); }
+@media (max-width: 900px) {
+  .hero-heading { font-size: var(--text-heading-lg); }
+}
+@media (max-width: 480px) {
+  .hero-heading { font-size: var(--text-heading); }
+}
+
 /* Marketing page sections alternate white / snow backgrounds -- one
    place to control that rhythm rather than repeating it inline per
    section on the homepage. */

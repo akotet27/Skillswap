@@ -35,7 +35,7 @@ export default function LandingPage() {
       {/* --- Hero --- */}
       <div className="container hero-grid" style={{ paddingTop: "var(--space-16)", paddingBottom: "var(--space-20)", display: "grid", gap: "var(--space-12)", alignItems: "center" }}>
         <div>
-          <h1 style={{ fontSize: "var(--text-display)" }}>Learn from Peers. Trade Your Time. No Money.</h1>
+          <h1 className="hero-heading">Learn from Peers. Trade Your Time. No Money.</h1>
           <p style={{ fontSize: "var(--text-body-lg)" }}>
             Swap skills one-for-one. You teach for an hour, you earn a credit to learn from someone else.
           </p>
