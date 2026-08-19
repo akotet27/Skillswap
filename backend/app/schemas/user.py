@@ -61,6 +61,20 @@ class PublicSkillOut(BaseModel):
         from_attributes = True
 
 
+class UserBriefOut(BaseModel):
+    """Just enough to show "who" in a list row (avatar + name) -- used for
+    the other party on a swap request, where the full PublicUserOut (bio,
+    ratings, skills, badges...) would be unnecessary weight and the private
+    UserOut would leak fields (email, is_admin, totp_enabled...) that are
+    nobody else's business."""
+    id: int
+    name: str
+    photo_url: str | None
+
+    class Config:
+        from_attributes = True
+
+
 class PublicUserOut(BaseModel):
     id: int
     name: str

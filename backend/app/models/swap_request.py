@@ -34,7 +34,9 @@ class SwapRequest(Base):
     sessions: Mapped[list["Session"]] = relationship(back_populates="request")  # noqa: F821
     # foreign_keys= is required on both: SQLAlchemy can't infer which FK a
     # relationship means when two columns here point at the same table
-    # (skills). Required by SwapRequestOut (schemas/session.py), which
-    # nests full SkillOut objects, not just the raw ids.
+    # (skills, or users below). Required by SwapRequestOut (schemas/session.py),
+    # which nests full SkillOut/UserBriefOut objects, not just the raw ids.
     skill_taught: Mapped["Skill"] = relationship(foreign_keys=[skill_taught_id])  # noqa: F821
     skill_learned: Mapped["Skill"] = relationship(foreign_keys=[skill_learned_id])  # noqa: F821
+    requester: Mapped["User"] = relationship(foreign_keys=[requester_id])  # noqa: F821
+    recipient: Mapped["User"] = relationship(foreign_keys=[recipient_id])  # noqa: F821

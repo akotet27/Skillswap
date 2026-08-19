@@ -4,7 +4,7 @@ from pydantic import BaseModel, model_validator
 
 from app.models.session import SessionStatus, ParticipantRole
 from app.models.swap_request import SwapRequestStatus
-from app.schemas.user import SkillOut, UserOut
+from app.schemas.user import SkillOut, UserBriefOut, UserOut
 
 
 class SwapRequestCreate(BaseModel):
@@ -25,6 +25,8 @@ class SwapRequestOut(BaseModel):
     id: int
     requester_id: int
     recipient_id: int
+    requester: UserBriefOut
+    recipient: UserBriefOut
     skill_taught: SkillOut
     skill_learned: SkillOut
     status: SwapRequestStatus

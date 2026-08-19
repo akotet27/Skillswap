@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiJson } from "../api/client";
+import { apiJson, API_BASE } from "../api/client";
 import { useNotifications } from "../context/NotificationsContext";
 
 function fmt(iso) {
@@ -69,14 +69,33 @@ export default function RequestsPage() {
       {requests?.length === 0 && <p>No {mode} requests.</p>}
 
       <div style={{ display: "grid", gap: "var(--space-4)" }}>
-        {requests?.map((r) => (
+        {requests?.map((r) => {
+          // "Who" is whichever side of the request isn't me -- the person
+          // who sent it (incoming) or the person I sent it to (outgoing).
+          const other = mode === "incoming" ? r.requester : r.recipient;
+          return (
           <div key={r.id} className="card" style={{ padding: "var(--space-6)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
-            <div>
-              <p style={{ margin: 0 }}>
-                <span className="tag tag-learn">Learn: {r.skill_learned.name}</span>{" "}
-                <span className="tag tag-teach">In return: {r.skill_taught.name}</span>
-              </p>
-              <p className="field-hint" style={{ margin: "var(--space-2) 0 0" }}>{fmt(r.proposed_start_utc)} — status: {r.status}</p>
+            <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
+              <img
+                src={other.photo_url ? `${API_BASE}${other.photo_url}` : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(other.name)}`}
+                alt=""
+                width={40}
+                height={40}
+                style={{ borderRadius: "999px", objectFit: "cover", border: "1px solid var(--border)", flexShrink: 0 }}
+              />
+              <div>
+                <p style={{ margin: 0 }}>
+                  <strong>{other.name}</strong>{" "}
+                  <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
+                    {mode === "incoming" ? "wants to learn from you" : "you sent this to"}
+                  </span>
+                </p>
+                <p style={{ margin: "var(--space-1) 0 0" }}>
+                  <span className="tag tag-learn">Learn: {r.skill_learned.name}</span>{" "}
+                  <span className="tag tag-teach">In return: {r.skill_taught.name}</span>
+                </p>
+                <p className="field-hint" style={{ margin: "var(--space-2) 0 0" }}>{fmt(r.proposed_start_utc)} — status: {r.status}</p>
+              </div>
             </div>
             {mode === "incoming" && r.status === "pending" && (
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -89,7 +108,8 @@ export default function RequestsPage() {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
