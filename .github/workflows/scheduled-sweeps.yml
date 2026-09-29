@@ -21,6 +21,8 @@ name: Scheduled sweeps
 on:
   workflow_dispatch: {}  # lets you trigger either job manually from the Actions tab to test
 
+permissions: {}
+
 jobs:
   credit-escrow-sweep:
     if: github.event_name == 'workflow_dispatch'
