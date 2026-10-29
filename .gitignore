@@ -30,9 +30,9 @@ frontend/*.local
 .env
 .env.local
 *.env
-!.env.example
-!backend/.env.example
-!frontend/.env.example
+.env.example
+backend/.env.example
+frontend/.env.example
 
 # --- Editor / OS ---
 .vscode/
