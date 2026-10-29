@@ -33,6 +33,8 @@ frontend/*.local
 .env.example
 backend/.env.example
 frontend/.env.example
+.env.example
+.env
 
 # --- Editor / OS ---
 .vscode/
